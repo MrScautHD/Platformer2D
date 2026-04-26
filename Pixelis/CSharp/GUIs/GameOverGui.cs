@@ -46,6 +46,12 @@ public class GameOverGui : Gui
         LabelData resetButtonLabelData = new LabelData(ContentRegistry.Fontoe, "Reset", 18, hoverColor: Color.White);
         
         this.AddElement("Reset-Button", new TextureButtonElement(resetButtonData, resetButtonLabelData, Anchor.Center, new Vector2(0, 0), size: new Vector2(230, 40), textOffset: new Vector2(0, 1), clickFunc: (element) => {
+            if (SceneManager.ActiveScene is CustomLevelScene customLevelScene && customLevelScene.IsPlayingFromEditor)
+            {
+                customLevelScene.ReturnToEditorMode();
+                return true;
+            }
+
             if (SceneManager.ActiveScene is LevelScene level)
             {
                 foreach (Entity entity in level.GetEntities())
@@ -54,15 +60,23 @@ public class GameOverGui : Gui
                     {
                         if (player.IsLocalPlayer)
                         {
-                            player.LocalTransform.Translation = new Vector3(0, -16 * 2, 0);
-                            player.GetComponent<RigidBody2D>()?.Awake = true;
+                            player.LocalTransform.Translation = player.SpawnPoint;
+                            if (player.GetComponent<RigidBody2D>() is RigidBody2D rigidBody)
+                            {
+                                rigidBody.LinearVelocity = Vector2.Zero;
+                                rigidBody.Awake = true;
+                            }
                             SceneManager.ActiveCam2D?.Position = new Vector2(player.LocalTransform.Translation.X, player.LocalTransform.Translation.Y);   
                         }
                         
                         if (NetworkManager.Client == null || !NetworkManager.Client.IsConnected)
                         {
-                            player.LocalTransform.Translation = new Vector3(0, -16 * 2, 0);
-                            player.GetComponent<RigidBody2D>()?.Awake = true;
+                            player.LocalTransform.Translation = player.SpawnPoint;
+                            if (player.GetComponent<RigidBody2D>() is RigidBody2D rigidBody)
+                            {
+                                rigidBody.LinearVelocity = Vector2.Zero;
+                                rigidBody.Awake = true;
+                            }
                             SceneManager.ActiveCam2D?.Position = new Vector2(player.LocalTransform.Translation.X, player.LocalTransform.Translation.Y);   
                         }
                     }

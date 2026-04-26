@@ -4,6 +4,8 @@ using Bliss.CSharp.Transformations;
 using Pixelis.CSharp.Entities;
 using Pixelis.CSharp.GUIs;
 using Pixelis.CSharp.GUIs.Loading;
+using Pixelis.CSharp.Levels;
+using Pixelis.CSharp.Scenes;
 using Pixelis.CSharp.Scenes.Levels;
 using Riptide;
 using Sparkle.CSharp.GUI;
@@ -34,6 +36,7 @@ public static class NetworkManager
     
     // Track current level for all clients
     private static string _currentLevel = "";
+    private static string _currentLevelPayload = "";
     
     // Connection callbacks
     private static Action? _onConnectionSuccess;
@@ -53,6 +56,7 @@ public static class NetworkManager
     {
         errorMessage = string.Empty;
         _currentLevel = levelName;
+        _currentLevelPayload = CreateLevelPayload(levelName);
         
         // Store the host username so it can be used when the host client connects
         _pendingUsername = hostUsername;
@@ -82,11 +86,10 @@ public static class NetworkManager
         Server.ClientConnected += (sender, args) =>
         {
             Logger.Info($"[SERVER] Client {args.Client.Id} connected");
-            
-            int sceneInt = GetSceneInt(_currentLevel);
-            
+
             Message message = Message.Create(MessageSendMode.Reliable, 1);
-            message.AddInt(sceneInt);
+            message.AddString(_currentLevel);
+            message.AddString(_currentLevelPayload);
             message.AddUShort(args.Client.Id);
             
             // Send list of existing player IDs and their usernames
@@ -143,36 +146,6 @@ public static class NetworkManager
         Client.Connect("127.0.0.1:7777");
         Logger.Info($"[CLIENT] Host connecting to own server with username: {hostUsername}");
         return true;
-    }
-    
-    // Helper method to convert level name to int
-    private static int GetSceneInt(string levelName)
-    {
-        switch (levelName)
-        {
-            case "Level 1":
-                return 1;
-            case "Level 2":
-                return 2;
-            case "Level 3":
-                return 3;
-            case "Level 4":
-                return 4;
-            case "Level 5":
-                return 5;
-            case "Level 6":
-                return 6;
-            case "Level 7":
-                return 7;
-            case "Level 8":
-                return 8;
-            case "Level 9":
-                return 9;
-            case "Level 10":
-                return 10;
-            default:
-                return 1;
-        }
     }
     
     // Server-side message handler
@@ -256,7 +229,7 @@ public static class NetworkManager
         Logger.Info($"[SERVER] Player {fromClientId} completed level, transitioning all players to {nextLevel}");
         
         _currentLevel = nextLevel;
-        int sceneInt = GetSceneInt(nextLevel);
+        _currentLevelPayload = CreateLevelPayload(nextLevel);
         
         // Remember all connected player IDs before transition
         List<ushort> connectedPlayers = new List<ushort>(NetworkedPlayers.Keys);
@@ -264,7 +237,8 @@ public static class NetworkManager
         
         // Send level transition message to ALL clients
         Message levelTransitionMessage = Message.Create(MessageSendMode.Reliable, 7);
-        levelTransitionMessage.AddInt(sceneInt);
+        levelTransitionMessage.AddString(_currentLevel);
+        levelTransitionMessage.AddString(_currentLevelPayload);
         Server.SendToAll(levelTransitionMessage);
         
         // Force server update to ensure message is sent
@@ -343,9 +317,10 @@ public static class NetworkManager
     // Handle level transition message from server
     private static void HandleLevelTransition(Message message)
     {
-        int sceneInt = message.GetInt();
+        string levelName = message.GetString();
+        string levelPayload = message.GetString();
         
-        Logger.Info($"[CLIENT] Received level transition to scene {sceneInt}");
+        Logger.Info($"[CLIENT] Received level transition to {levelName}");
         
         _isLevelTransition = true;
         
@@ -374,53 +349,15 @@ public static class NetworkManager
         NetworkedPlayers.Clear();
 
         AsyncOperation? operation = null;
-        
-        // Load the new level
-        switch (sceneInt)
+
+        Scene? nextScene = CreateNetworkScene(levelName, levelPayload);
+        if (nextScene != null)
         {
-            case 1:
-                Logger.Info("[CLIENT] Transitioning to Level1...");
-                operation = SceneManager.LoadSceneAsync(new Level1(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 2:
-                Logger.Info("[CLIENT] Transitioning to Level2...");
-                operation = SceneManager.LoadSceneAsync(new Level2(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 3:
-                Logger.Info("[CLIENT] Transitioning to Level3...");
-                operation = SceneManager.LoadSceneAsync(new Level3(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 4:
-                Logger.Info("[CLIENT] Transitioning to Level4...");
-                operation = SceneManager.LoadSceneAsync(new Level4(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 5:
-                Logger.Info("[CLIENT] Transitioning to Level5...");
-                operation = SceneManager.LoadSceneAsync(new Level5(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 6:
-                Logger.Info("[CLIENT] Transitioning to Level6...");
-                operation = SceneManager.LoadSceneAsync(new Level6(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 7:
-                Logger.Info("[CLIENT] Transitioning to Level7...");
-                operation = SceneManager.LoadSceneAsync(new Level7(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 8:
-                Logger.Info("[CLIENT] Transitioning to Level8...");
-                operation = SceneManager.LoadSceneAsync(new Level8(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 9:
-                Logger.Info("[CLIENT] Transitioning to Level9...");
-                operation = SceneManager.LoadSceneAsync(new Level9(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 10:
-                Logger.Info("[CLIENT] Transitioning to Level10...");
-                operation = SceneManager.LoadSceneAsync(new Level10(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            default:
-                Logger.Error($"[CLIENT] Unknown scene int: {sceneInt}");
-                break;
+            operation = SceneManager.LoadSceneAsync(nextScene, new ProgressBarLoadingGui("Loading", "Joining Server!"));
+        }
+        else
+        {
+            Logger.Error($"[CLIENT] Could not create level scene for {levelName}");
         }
 
         operation?.Completed += success =>
@@ -628,10 +565,11 @@ public static class NetworkManager
     {
         Logger.Info("[CLIENT] HandleInitialConnection called!");
         
-        int sceneInt = message.GetInt();
+        string levelName = message.GetString();
+        string levelPayload = message.GetString();
         LocalPlayerId = message.GetUShort();
         
-        Logger.Info($"[CLIENT] Received scene: {sceneInt}, LocalPlayerId: {LocalPlayerId}");
+        Logger.Info($"[CLIENT] Received level: {levelName}, LocalPlayerId: {LocalPlayerId}");
         
         // Send username to server now that we have our player ID
         if (Client != null && Client.IsConnected)
@@ -659,52 +597,15 @@ public static class NetworkManager
         Logger.Info($"[CLIENT] Existing players: {existingPlayerCount}");
 
         AsyncOperation? operation = null;
-        
-        switch (sceneInt)
+
+        Scene? initialScene = CreateNetworkScene(levelName, levelPayload);
+        if (initialScene != null)
         {
-            case 1:
-                Logger.Info("[CLIENT] Loading Level1...");
-                operation = SceneManager.LoadSceneAsync(new Level1(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 2:
-                Logger.Info("[CLIENT] Loading Level2...");
-                operation = SceneManager.LoadSceneAsync(new Level2(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 3:
-                Logger.Info("[CLIENT] Loading Level3...");
-                operation = SceneManager.LoadSceneAsync(new Level3(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 4:
-                Logger.Info("[CLIENT] Loading Level4...");
-                operation = SceneManager.LoadSceneAsync(new Level4(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 5:
-                Logger.Info("[CLIENT] Loading Level5...");
-                operation = SceneManager.LoadSceneAsync(new Level5(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 6:
-                Logger.Info("[CLIENT] Loading Level6...");
-                operation = SceneManager.LoadSceneAsync(new Level6(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 7:
-                Logger.Info("[CLIENT] Loading Level7...");
-                operation = SceneManager.LoadSceneAsync(new Level7(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 8:
-                Logger.Info("[CLIENT] Loading Level8...");
-                operation = SceneManager.LoadSceneAsync(new Level8(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 9:
-                Logger.Info("[CLIENT] Loading Level9...");
-                operation = SceneManager.LoadSceneAsync(new Level9(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            case 10:
-                Logger.Info("[CLIENT] Loading Level10...");
-                operation = SceneManager.LoadSceneAsync(new Level10(), new ProgressBarLoadingGui("Loading", "Joining Server!"));
-                break;
-            default:
-                Logger.Error($"[CLIENT] Unknown scene int: {sceneInt}");
-                break;
+            operation = SceneManager.LoadSceneAsync(initialScene, new ProgressBarLoadingGui("Loading", "Joining Server!"));
+        }
+        else
+        {
+            Logger.Error($"[CLIENT] Could not create level scene for {levelName}");
         }
 
         operation?.Completed += success =>
@@ -831,6 +732,25 @@ public static class NetworkManager
     private static void HandleClearChat()
     {
         ChatClearedReceived?.Invoke();
+    }
+
+    private static string CreateLevelPayload(string levelName)
+    {
+        return CustomLevelStorage.ExportLevelPayload(levelName) ?? string.Empty;
+    }
+
+    private static Scene? CreateNetworkScene(string levelName, string levelPayload)
+    {
+        if (!string.IsNullOrWhiteSpace(levelPayload))
+        {
+            CustomLevelData? levelData = CustomLevelStorage.ImportLevelPayload(levelPayload);
+            if (levelData != null)
+            {
+                return new CustomLevelScene(levelData, false);
+            }
+        }
+
+        return LevelFactory.CreateByName(levelName);
     }
     
     // Send player position update

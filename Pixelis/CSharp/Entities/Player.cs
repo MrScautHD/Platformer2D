@@ -64,6 +64,7 @@ public class Player : Entity
     // Respawn system
     private const float DEATH_Y = 100f;
     private Vector3 _spawnPoint;
+    public Vector3 SpawnPoint => _spawnPoint;
 
     // Level completion
     private bool _hasCompletedLevel = false;
@@ -233,7 +234,9 @@ public class Player : Entity
         RigidBody2D body = this.GetComponent<RigidBody2D>()!;
         Vector2 velocity = body.LinearVelocity;
 
-        if (GuiManager.ActiveGui == null)
+        bool canMoveWithGui = this.Scene is CustomLevelScene customLevelScene && customLevelScene.IsPlayingFromEditor;
+
+        if (GuiManager.ActiveGui == null || canMoveWithGui)
         {
             if (!NetworkManager.IsChatInputBlocked())
             {
@@ -496,6 +499,12 @@ public class Player : Entity
         if ((e.ShapeA.UserData?.ToString() == "flag") ||
              e.ShapeB.UserData?.ToString() == "flag")
         {
+            if (this.Scene is CustomLevelScene customLevelScene && customLevelScene.IsPlayingFromEditor)
+            {
+                customLevelScene.ResetEditorPlayerToOrigin();
+                return;
+            }
+
             ((LevelScene)this.Scene).WonLevel = true;
 
             if (IsLocalPlayer && !_hasCompletedLevel)
@@ -527,6 +536,11 @@ public class Player : Entity
 
     private string DetermineNextLevel()
     {
+        if (this.Scene is CustomLevelScene customLevelScene && !string.IsNullOrWhiteSpace(customLevelScene.NextLevelName))
+        {
+            return customLevelScene.NextLevelName;
+        }
+
         if (this.Scene is Level1) return "Level 2";
         if (this.Scene is Level2) return "Level 3";
         if (this.Scene is Level3) return "Level 4";

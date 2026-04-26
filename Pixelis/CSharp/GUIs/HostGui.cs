@@ -7,6 +7,7 @@ using Bliss.CSharp.Logging;
 using Bliss.CSharp.Textures;
 using Bliss.CSharp.Transformations;
 using Bliss.CSharp.Windowing;
+using Pixelis.CSharp.Scenes;
 using Sparkle.CSharp.Graphics;
 using Sparkle.CSharp.GUI;
 using Sparkle.CSharp.GUI.Elements;
@@ -87,26 +88,17 @@ public class HostGui : Gui
             sliderBarBorderInsets: new BorderInsets(5)
         );
         
-        List<LabelData> options = [
-            new LabelData(ContentRegistry.Fontoe, "Level 1", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 2", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 3", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 4", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 5", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 6", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 7", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 8", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 9", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 10", 18),
-        ];
+        List<LabelData> options = LevelFactory.GetMenuLevelNames()
+            .Select(levelName => new LabelData(ContentRegistry.Fontoe, levelName, 18))
+            .ToList();
         
         TextureDropDownElement dropDownElement = new TextureDropDownElement(
             selectionDropDownData,
             options,
             4,
             Anchor.Center,
-            new Vector2(200, 60),
-            size: new Vector2(120, 40),
+            new Vector2(190, 60),
+            size: new Vector2(140, 40),
             scale: new Vector2(1, 1),
             fieldTextOffset: new Vector2(10, 1),
             menuTextOffset: new Vector2(10, 1),

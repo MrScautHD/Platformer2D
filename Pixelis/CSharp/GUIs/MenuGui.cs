@@ -6,6 +6,8 @@ using Bliss.CSharp.Transformations;
 using Bliss.CSharp.Windowing;
 using Pixelis.CSharp.Entities;
 using Pixelis.CSharp.GUIs.Loading;
+using Pixelis.CSharp.Levels;
+using Pixelis.CSharp.Scenes;
 using Pixelis.CSharp.Scenes.Levels;
 using Sparkle.CSharp;
 using Sparkle.CSharp.Graphics;
@@ -130,19 +132,9 @@ public class MenuGui : Gui
             sliderBarBorderInsets: new BorderInsets(5)
         );
 
-        List<LabelData> options =
-        [
-            new LabelData(ContentRegistry.Fontoe, "Level 1", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 2", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 3", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 4", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 5", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 6", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 7", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 8", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 9", 18),
-            new LabelData(ContentRegistry.Fontoe, "Level 10", 18),
-        ];
+        List<LabelData> options = LevelFactory.GetMenuLevelNames()
+            .Select(levelName => new LabelData(ContentRegistry.Fontoe, levelName, 18))
+            .ToList();
 
         TextureDropDownElement dropDownElement = new TextureDropDownElement(
             selectionDropDownData,
@@ -186,57 +178,11 @@ public class MenuGui : Gui
             Anchor.Center, Vector2.Zero, size: new Vector2(230, 40), textOffset: new Vector2(0, 1),
             clickFunc: (element) =>
             {
-                switch (dropDownElement.SelectedOption?.Text)
+                Scene? selectedScene = LevelFactory.CreateByName(dropDownElement.SelectedOption?.Text ?? "Level 1");
+                if (selectedScene != null)
                 {
-                    case "Level 1":
-                        AsyncOperation operation = SceneManager.LoadSceneAsync(new Level1(), new ProgressBarLoadingGui("Loading"));
-                        operation.Completed += OnCompletedLoading;
-                        break;
-
-                    case "Level 2":
-                        AsyncOperation operation2 = SceneManager.LoadSceneAsync(new Level2(), new ProgressBarLoadingGui("Loading"));
-                        operation2.Completed += OnCompletedLoading;
-                        break;
-
-                    case "Level 3":
-                        AsyncOperation operation3 = SceneManager.LoadSceneAsync(new Level3(), new ProgressBarLoadingGui("Loading"));
-                        operation3.Completed += OnCompletedLoading;
-                        break;
-
-                    case "Level 4":
-                        AsyncOperation operation4 = SceneManager.LoadSceneAsync(new Level4(), new ProgressBarLoadingGui("Loading"));
-                        operation4.Completed += OnCompletedLoading;
-                        break;
-
-                    case "Level 5":
-                        AsyncOperation operation5 = SceneManager.LoadSceneAsync(new Level5(), new ProgressBarLoadingGui("Loading"));
-                        operation5.Completed += OnCompletedLoading;
-                        break;
-
-                    case "Level 6":
-                        AsyncOperation operation6 = SceneManager.LoadSceneAsync(new Level6(), new ProgressBarLoadingGui("Loading"));
-                        operation6.Completed += OnCompletedLoading;
-                        break;
-
-                    case "Level 7":
-                        AsyncOperation operation7 = SceneManager.LoadSceneAsync(new Level7(), new ProgressBarLoadingGui("Loading"));
-                        operation7.Completed += OnCompletedLoading;
-                        break;
-
-                    case "Level 8":
-                        AsyncOperation operation8 = SceneManager.LoadSceneAsync(new Level8(), new ProgressBarLoadingGui("Loading"));
-                        operation8.Completed += OnCompletedLoading;
-                        break;
-
-                    case "Level 9":
-                        AsyncOperation operation9 = SceneManager.LoadSceneAsync(new Level9(), new ProgressBarLoadingGui("Loading"));
-                        operation9.Completed += OnCompletedLoading;
-                        break;
-
-                    case "Level 10":
-                        AsyncOperation operation10 = SceneManager.LoadSceneAsync(new Level10(), new ProgressBarLoadingGui("Loading"));
-                        operation10.Completed += OnCompletedLoading;
-                        break;
+                    AsyncOperation operation = SceneManager.LoadSceneAsync(selectedScene, new ProgressBarLoadingGui("Loading"));
+                    operation.Completed += OnCompletedLoading;
                 }
                 
                 return true;
@@ -292,6 +238,18 @@ public class MenuGui : Gui
 
                 return true;
             }));
+
+        this.AddElement("Level-Editor-Button", new TextureButtonElement(optionsButtonData,
+            new LabelData(ContentRegistry.Fontoe, "Level Editor", 18, hoverColor: Color.White),
+            Anchor.Center, new Vector2(0, 120), size: new Vector2(230, 40), textOffset: new Vector2(0, 1),
+            clickFunc: _ =>
+            {
+                GuiManager.SetGui(new LevelEditorBrowserGui());
+                return true;
+            }));
+
+        ((TextureButtonElement)this.GetElement("Options-Button")!).Offset = new Vector2(0, 180);
+        ((TextureButtonElement)this.GetElement("Exit-Button")!).Offset = new Vector2(0, 240);
     }
 
     protected override void Draw(GraphicsContext context, Framebuffer framebuffer)
@@ -314,6 +272,12 @@ public class MenuGui : Gui
     private void OnCompletedLoading(bool success)
     {
         GuiManager.SetGui(null);
+        if (SceneManager.ActiveScene is CustomLevelScene customLevelScene)
+        {
+            customLevelScene.SpawnGameplayPlayerAtOrigin();
+            return;
+        }
+
         Player player = new Player(new Transform() { Translation = new Vector3(0, -16 * 2, 0) });
         SceneManager.ActiveScene?.AddEntity(player);
     }
