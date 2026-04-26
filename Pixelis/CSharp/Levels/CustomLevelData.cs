@@ -16,4 +16,5 @@ public class CustomLevelBlockData
     public int? TargetX { get; set; }
     public int? TargetY { get; set; }
     public float? Speed { get; set; }
+    public float? Depth { get; set; }
 }

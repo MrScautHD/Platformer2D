@@ -131,7 +131,8 @@ public static class CustomLevelStorage
                 Y = block.Y,
                 TargetX = block.TargetX,
                 TargetY = block.TargetY,
-                Speed = block.Speed
+                Speed = block.Speed,
+                Depth = block.Depth
             })
             .OrderBy(block => block.Y)
             .ThenBy(block => block.X)

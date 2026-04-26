@@ -15,16 +15,18 @@ public class MovingBlock : Entity {
     public int TargetBlockPosX;
     public int TargetBlockPosY;
     public float Speed;
+    public float LayerDepth;
     
     private RigidBody2D _rigidBody;
     private double _lifeTime;
     
-    public MovingBlock(int blockPosX, int blockPosY, int targetBlockPosX, int targetBlockPosY, float speed) : base(new Transform() { Translation = new Vector3(blockPosX, blockPosY, 0)}, "Moving Block") {
+    public MovingBlock(int blockPosX, int blockPosY, int targetBlockPosX, int targetBlockPosY, float speed, float layerDepth = 0.5F) : base(new Transform() { Translation = new Vector3(blockPosX, blockPosY, 0)}, "Moving Block") {
         this.BlockPosX = blockPosX * 16;
         this.BlockPosY = blockPosY * 16;
         this.TargetBlockPosX = targetBlockPosX * 16;
         this.TargetBlockPosY = targetBlockPosY * 16;
         this.Speed = speed;
+        this.LayerDepth = layerDepth;
     }
 
     /// <summary>
@@ -33,7 +35,7 @@ public class MovingBlock : Entity {
     protected override void Init() {
         base.Init();
         
-        this.AddComponent(new Sprite(ContentRegistry.Sprite, Vector2.Zero));
+        this.AddComponent(new Sprite(ContentRegistry.Sprite, Vector2.Zero, layerDepth: this.LayerDepth));
 
         this._rigidBody = new RigidBody2D(new BodyDefinition() { Type = BodyType.Kinematic },
             new PolygonShape2D(Polygon.MakeBox(8, 8), new ShapeDef() {

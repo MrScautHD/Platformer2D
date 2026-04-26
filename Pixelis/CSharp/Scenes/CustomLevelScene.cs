@@ -26,6 +26,7 @@ namespace Pixelis.CSharp.Scenes;
 public class CustomLevelScene : LevelScene
 {
     private const int BlockSize = 16;
+    private const float DefaultPlaceableDepth = 0.5F;
     private readonly Dictionary<(int X, int Y), PlacedObject> _placedObjects = [];
     private readonly bool _editorMode;
     private readonly string? _originalLevelId;
@@ -34,7 +35,9 @@ public class CustomLevelScene : LevelScene
     private EditorTool _selectedTool = EditorTool.Place;
     private PlaceableType _selectedPlaceable = PlaceableType.Block;
     private float _selectedMovingBlockSpeed = 1F;
+    private float _selectedPlaceableDepth = DefaultPlaceableDepth;
     private (int X, int Y)? _pendingMovingBlockStart;
+    private (int X, int Y)? _pendingPortalStart;
     private bool _isPlaying;
     private bool _suppressPlacementUntilMouseReleased;
 
@@ -53,7 +56,8 @@ public class CustomLevelScene : LevelScene
                     Y = block.Y,
                     TargetX = block.TargetX,
                     TargetY = block.TargetY,
-                    Speed = block.Speed
+                    Speed = block.Speed,
+                    Depth = block.Depth
                 })
                 .ToList()
         };
@@ -67,6 +71,7 @@ public class CustomLevelScene : LevelScene
     public EditorTool SelectedTool => _selectedTool;
     public PlaceableType SelectedPlaceable => _selectedPlaceable;
     public float SelectedMovingBlockSpeed => _selectedMovingBlockSpeed;
+    public float SelectedPlaceableDepth => _selectedPlaceableDepth;
     public bool HasPendingMovingBlockStart => _pendingMovingBlockStart.HasValue;
     public bool HasWinFlag => _placedObjects.Values.Any(entry => entry.Type == PlaceableType.WinFlag);
     public string NextLevelName => _levelData.NextLevelName;
@@ -89,7 +94,8 @@ public class CustomLevelScene : LevelScene
                     Y = block.Y,
                     TargetX = block.TargetX,
                     TargetY = block.TargetY,
-                    Speed = block.Speed
+                    Speed = block.Speed,
+                    Depth = block.Depth
                 }, persist: false);
             }
         }
@@ -128,9 +134,9 @@ public class CustomLevelScene : LevelScene
 
         if (Input.IsKeyPressed(KeyboardKey.Escape))
         {
-            if (_pendingMovingBlockStart.HasValue)
+            if (_pendingMovingBlockStart.HasValue || _pendingPortalStart.HasValue)
             {
-                ClearPendingMovingBlock();
+                ClearPendingPlacement();
                 return;
             }
 
@@ -151,9 +157,13 @@ public class CustomLevelScene : LevelScene
             {
                 HandleMovingBlockPlacement(blockX, blockY);
             }
+            else if (_selectedPlaceable == PlaceableType.Portal)
+            {
+                HandlePortalPlacement(blockX, blockY);
+            }
             else
             {
-                PlacePlaceable(CreatePlaceableData(_selectedPlaceable, blockX, blockY), persist: true);
+                PlacePlaceable(CreatePlaceableData(_selectedPlaceable, blockX, blockY, depth: _selectedPlaceableDepth), persist: true);
             }
         }
     }
@@ -200,6 +210,22 @@ public class CustomLevelScene : LevelScene
                 color: Color.Yellow);
         }
 
+        if (_pendingPortalStart.HasValue)
+        {
+            Vector2 startPosition = new(_pendingPortalStart.Value.X * BlockSize, _pendingPortalStart.Value.Y * BlockSize);
+            Vector2 startOutlineTopLeft = startPosition - new Vector2(BlockSize / 2F, BlockSize / 2F);
+
+            context.PrimitiveBatch.DrawEmptyRectangle(
+                new RectangleF(startOutlineTopLeft.X, startOutlineTopLeft.Y, BlockSize, BlockSize),
+                2F,
+                color: Color.Cyan);
+            context.PrimitiveBatch.DrawLine(
+                startPosition,
+                blockPosition,
+                1.5F,
+                color: Color.Cyan);
+        }
+
         context.PrimitiveBatch.End();
     }
 
@@ -236,7 +262,7 @@ public class CustomLevelScene : LevelScene
         _selectedTool = tool;
         if (tool != EditorTool.Place)
         {
-            ClearPendingMovingBlock();
+            ClearPendingPlacement();
         }
 
         RefreshEditorGui();
@@ -246,7 +272,7 @@ public class CustomLevelScene : LevelScene
     {
         if (_selectedPlaceable != placeable)
         {
-            ClearPendingMovingBlock();
+            ClearPendingPlacement();
         }
 
         _selectedPlaceable = placeable;
@@ -260,6 +286,12 @@ public class CustomLevelScene : LevelScene
         RefreshEditorGui();
     }
 
+    public void SetPlaceableDepth(float depth)
+    {
+        _selectedPlaceableDepth = depth;
+        RefreshEditorGui();
+    }
+
     public void SetNextLevelName(string nextLevelName)
     {
         _levelData.NextLevelName = nextLevelName.Trim();
@@ -270,11 +302,18 @@ public class CustomLevelScene : LevelScene
         if (_selectedPlaceable == PlaceableType.MovingBlock)
         {
             return _pendingMovingBlockStart.HasValue
-                ? $"Moving Block: choose target, speed {_selectedMovingBlockSpeed:0.0}"
-                : $"Moving Block: choose start, speed {_selectedMovingBlockSpeed:0.0}";
+                ? $"Moving Block: choose target, speed {_selectedMovingBlockSpeed:0.0}, depth {_selectedPlaceableDepth:0.0}"
+                : $"Moving Block: choose start, speed {_selectedMovingBlockSpeed:0.0}, depth {_selectedPlaceableDepth:0.0}";
         }
 
-        return "WASD / arrow keys move the camera";
+        if (_selectedPlaceable == PlaceableType.Portal)
+        {
+            return _pendingPortalStart.HasValue
+                ? $"Portal: choose target, depth {_selectedPlaceableDepth:0.0}"
+                : $"Portal: choose start, depth {_selectedPlaceableDepth:0.0}";
+        }
+
+        return $"WASD / arrow keys move the camera, depth {_selectedPlaceableDepth:0.0}";
     }
 
     public void StartEditorPlayMode()
@@ -434,6 +473,7 @@ public class CustomLevelScene : LevelScene
         [
             PlaceableType.Block,
             PlaceableType.MovingBlock,
+            PlaceableType.Portal,
             PlaceableType.WinFlag,
             PlaceableType.Tree,
             PlaceableType.TreeDead,
@@ -453,6 +493,7 @@ public class CustomLevelScene : LevelScene
         {
             PlaceableType.Block => "Block",
             PlaceableType.MovingBlock => "Moving Block",
+            PlaceableType.Portal => "Portal",
             PlaceableType.WinFlag => "Win Flag",
             PlaceableType.Tree => "Tree",
             PlaceableType.TreeDead => "Dead Tree",
@@ -500,8 +541,32 @@ public class CustomLevelScene : LevelScene
             start.Y,
             blockX,
             blockY,
-            _selectedMovingBlockSpeed), persist: true);
+            _selectedMovingBlockSpeed,
+            _selectedPlaceableDepth), persist: true);
         _pendingMovingBlockStart = null;
+        SuppressPlacementUntilMouseRelease();
+        RefreshEditorGui();
+    }
+
+    private void HandlePortalPlacement(int blockX, int blockY)
+    {
+        if (!_pendingPortalStart.HasValue)
+        {
+            _pendingPortalStart = (blockX, blockY);
+            SuppressPlacementUntilMouseRelease();
+            RefreshEditorGui();
+            return;
+        }
+
+        (int X, int Y) start = _pendingPortalStart.Value;
+        PlacePlaceable(CreatePlaceableData(
+            PlaceableType.Portal,
+            start.X,
+            start.Y,
+            blockX,
+            blockY,
+            depth: _selectedPlaceableDepth), persist: true);
+        _pendingPortalStart = null;
         SuppressPlacementUntilMouseRelease();
         RefreshEditorGui();
     }
@@ -559,7 +624,7 @@ public class CustomLevelScene : LevelScene
 
     private void RemovePlaceable(int blockX, int blockY)
     {
-        ClearPendingMovingBlock();
+        ClearPendingPlacement();
 
         if (!_placedObjects.TryGetValue((blockX, blockY), out PlacedObject? placedObject))
         {
@@ -599,6 +664,29 @@ public class CustomLevelScene : LevelScene
         RefreshEditorGui();
     }
 
+    private void ClearPendingPortal()
+    {
+        if (!_pendingPortalStart.HasValue)
+        {
+            return;
+        }
+
+        _pendingPortalStart = null;
+        RefreshEditorGui();
+    }
+
+    private void ClearPendingPlacement()
+    {
+        bool hadPending = _pendingMovingBlockStart.HasValue || _pendingPortalStart.HasValue;
+        _pendingMovingBlockStart = null;
+        _pendingPortalStart = null;
+
+        if (hadPending)
+        {
+            RefreshEditorGui();
+        }
+    }
+
     private void SpawnOrResetLocalPlayer(Vector3 spawnPoint)
     {
         Player? player = this.GetEntities().OfType<Player>().FirstOrDefault(entity => entity.IsLocalPlayer);
@@ -631,7 +719,8 @@ public class CustomLevelScene : LevelScene
         int blockY,
         int? targetX = null,
         int? targetY = null,
-        float? speed = null)
+        float? speed = null,
+        float? depth = null)
     {
         return new CustomLevelBlockData
         {
@@ -640,53 +729,61 @@ public class CustomLevelScene : LevelScene
             Y = blockY,
             TargetX = targetX,
             TargetY = targetY,
-            Speed = speed
+            Speed = speed,
+            Depth = depth ?? DefaultPlaceableDepth
         };
     }
 
     private static Entity CreatePlaceableEntity(CustomLevelBlockData blockData, PlaceableType placeable)
     {
+        float layerDepth = blockData.Depth ?? DefaultPlaceableDepth;
+
         return placeable switch
         {
-            PlaceableType.Block => CreateBlockEntity(blockData.X, blockData.Y),
+            PlaceableType.Block => CreateBlockEntity(blockData.X, blockData.Y, layerDepth),
             PlaceableType.MovingBlock => new MovingBlock(
                 blockData.X,
                 blockData.Y,
                 blockData.TargetX ?? blockData.X,
                 blockData.TargetY ?? blockData.Y,
-                blockData.Speed ?? 1F),
-            PlaceableType.WinFlag => new WinFlag(new Transform { Translation = new Vector3(blockData.X * BlockSize + 7, blockData.Y * BlockSize - 16, 0) }),
-            PlaceableType.Tree => CreateDecorativeEntity(ContentRegistry.TreeBig, blockData.X, blockData.Y, -20.5F),
-            PlaceableType.TreeDead => CreateDecorativeEntity(ContentRegistry.TreeBigDead, blockData.X, blockData.Y, -11F),
-            PlaceableType.FlowerOrange => CreateDecorativeEntity(ContentRegistry.PlantFlower, blockData.X, blockData.Y, -8F),
-            PlaceableType.Bush => CreateDecorativeEntity(ContentRegistry.Bush, blockData.X, blockData.Y, 1F),
-            PlaceableType.PlantSunFlower => CreateDecorativeEntity(ContentRegistry.PlantSunFlower, blockData.X, blockData.Y, -8F),
-            PlaceableType.BushDead => CreateDecorativeEntity(ContentRegistry.BushDead, blockData.X, blockData.Y, 0F),
-            PlaceableType.RockWithGrass => CreateDecorativeEntity(ContentRegistry.RockGrass, blockData.X, blockData.Y, 0F),
-            PlaceableType.PlantFlowerRed => CreateDecorativeEntity(ContentRegistry.PlantFlowerRed, blockData.X, blockData.Y, 0F),
-            PlaceableType.OakLog => CreateDecorativeEntity(ContentRegistry.OakLog, blockData.X, blockData.Y, 0F),
-            _ => CreateBlockEntity(blockData.X, blockData.Y)
+                blockData.Speed ?? 1F,
+                layerDepth),
+            PlaceableType.Portal => new Portal(
+                new Transform { Translation = new Vector3(blockData.X * BlockSize, blockData.Y * BlockSize, 0) },
+                new Vector2((blockData.TargetX ?? blockData.X) * BlockSize, (blockData.TargetY ?? blockData.Y) * BlockSize),
+                layerDepth: layerDepth),
+            PlaceableType.WinFlag => new WinFlag(new Transform { Translation = new Vector3(blockData.X * BlockSize + 7, blockData.Y * BlockSize - 16, 0) }, layerDepth),
+            PlaceableType.Tree => CreateDecorativeEntity(ContentRegistry.TreeBig, blockData.X, blockData.Y, -20.5F, layerDepth),
+            PlaceableType.TreeDead => CreateDecorativeEntity(ContentRegistry.TreeBigDead, blockData.X, blockData.Y, -11F, layerDepth),
+            PlaceableType.FlowerOrange => CreateDecorativeEntity(ContentRegistry.PlantFlower, blockData.X, blockData.Y, -8F, layerDepth),
+            PlaceableType.Bush => CreateDecorativeEntity(ContentRegistry.Bush, blockData.X, blockData.Y, 1F, layerDepth),
+            PlaceableType.PlantSunFlower => CreateDecorativeEntity(ContentRegistry.PlantSunFlower, blockData.X, blockData.Y, -8F, layerDepth),
+            PlaceableType.BushDead => CreateDecorativeEntity(ContentRegistry.BushDead, blockData.X, blockData.Y, 0F, layerDepth),
+            PlaceableType.RockWithGrass => CreateDecorativeEntity(ContentRegistry.RockGrass, blockData.X, blockData.Y, 0F, layerDepth),
+            PlaceableType.PlantFlowerRed => CreateDecorativeEntity(ContentRegistry.PlantFlowerRed, blockData.X, blockData.Y, 0F, layerDepth),
+            PlaceableType.OakLog => CreateDecorativeEntity(ContentRegistry.OakLog, blockData.X, blockData.Y, 0F, layerDepth),
+            _ => CreateBlockEntity(blockData.X, blockData.Y, layerDepth)
         };
     }
 
-    private static Entity CreateDecorativeEntity(Texture2D texture, int blockX, int blockY, float offsetY)
+    private static Entity CreateDecorativeEntity(Texture2D texture, int blockX, int blockY, float offsetY, float layerDepth)
     {
         Entity entity = new(new Transform
         {
             Translation = new Vector3(blockX * BlockSize, blockY * BlockSize + offsetY, 0)
         });
-        entity.AddComponent(new Sprite(texture, Vector2.Zero, layerDepth: 0.4F));
+        entity.AddComponent(new Sprite(texture, Vector2.Zero, layerDepth: layerDepth));
         return entity;
     }
 
-    private static Entity CreateBlockEntity(int blockX, int blockY)
+    private static Entity CreateBlockEntity(int blockX, int blockY, float layerDepth)
     {
         Entity entity = new(new Transform
         {
             Translation = new Vector3(blockX * BlockSize, blockY * BlockSize, 0)
         });
 
-        entity.AddComponent(new Sprite(ContentRegistry.Sprite, Vector2.Zero));
+        entity.AddComponent(new Sprite(ContentRegistry.Sprite, Vector2.Zero, layerDepth: layerDepth));
         entity.AddComponent(new RigidBody2D(
             new BodyDefinition
             {
@@ -713,6 +810,7 @@ public class CustomLevelScene : LevelScene
     {
         Block,
         MovingBlock,
+        Portal,
         WinFlag,
         Tree,
         TreeDead,
@@ -736,7 +834,8 @@ public class CustomLevelScene : LevelScene
                 Y = data.Y,
                 TargetX = data.TargetX,
                 TargetY = data.TargetY,
-                Speed = data.Speed
+                Speed = data.Speed,
+                Depth = data.Depth
             };
             Type = type;
             Entity = entity;
@@ -753,7 +852,8 @@ public class CustomLevelScene : LevelScene
                    && Data.Y == other.Y
                    && Data.TargetX == other.TargetX
                    && Data.TargetY == other.TargetY
-                   && Math.Abs((Data.Speed ?? 0F) - (other.Speed ?? 0F)) < 0.001F;
+                   && Math.Abs((Data.Speed ?? 0F) - (other.Speed ?? 0F)) < 0.001F
+                   && Math.Abs((Data.Depth ?? DefaultPlaceableDepth) - (other.Depth ?? DefaultPlaceableDepth)) < 0.001F;
         }
 
         public CustomLevelBlockData CloneData()
@@ -765,7 +865,8 @@ public class CustomLevelScene : LevelScene
                 Y = Data.Y,
                 TargetX = Data.TargetX,
                 TargetY = Data.TargetY,
-                Speed = Data.Speed
+                Speed = Data.Speed,
+                Depth = Data.Depth
             };
         }
     }

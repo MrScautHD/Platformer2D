@@ -20,6 +20,7 @@ public class LevelEditorGui : Gui
     private LabelElement? _statusLabel;
     private TextureDropDownElement? _placeableDropDown;
     private TextureDropDownElement? _movingBlockSpeedDropDown;
+    private TextureDropDownElement? _placeableDepthDropDown;
     private TextureDropDownElement? _nextLevelDropDown;
 
     public bool IsSaveDialogOpen => _saveNameTextBox?.Enabled ?? false;
@@ -128,7 +129,7 @@ public class LevelEditorGui : Gui
             movingSpeedOptions,
             5,
             Anchor.TopRight,
-            new Vector2(-260, 20),
+            new Vector2(-400, 20),
             size: new Vector2(130, 40),
             fieldTextOffset: new Vector2(10, 1),
             menuTextOffset: new Vector2(10, 1),
@@ -149,6 +150,34 @@ public class LevelEditorGui : Gui
             }
         };
         this.AddElement("Moving-Block-Speed-Drop-Down", _movingBlockSpeedDropDown);
+
+        List<LabelData> depthOptions = GetDepthOptions(_scene.SelectedPlaceableDepth);
+        _placeableDepthDropDown = new TextureDropDownElement(
+            dropDownData,
+            depthOptions,
+            5,
+            Anchor.TopRight,
+            new Vector2(-260, 20),
+            size: new Vector2(130, 40),
+            fieldTextOffset: new Vector2(10, 1),
+            menuTextOffset: new Vector2(10, 1),
+            sliderOffset: new Vector2(-1F, 0),
+            scrollMaskInsets: (3, 3));
+        _placeableDepthDropDown.MenuToggled += isMenuOpen =>
+        {
+            _placeableDepthDropDown.DropDownData.MenuSourceRect = isMenuOpen && _placeableDepthDropDown.Options.Count > _placeableDepthDropDown.MaxVisibleOptions
+                ? new Rectangle(0, 0, (int)ContentRegistry.UiMenu.Width - 2, (int)ContentRegistry.UiMenu.Height)
+                : new Rectangle(0, 0, (int)ContentRegistry.UiMenu.Width, (int)ContentRegistry.UiMenu.Height);
+        };
+        _placeableDepthDropDown.OptionChanged += option =>
+        {
+            _scene.SuppressPlacementUntilMouseRelease();
+            if (TryParseDepth(option.Text, out float depth))
+            {
+                _scene.SetPlaceableDepth(depth);
+            }
+        };
+        this.AddElement("Placeable-Depth-Drop-Down", _placeableDepthDropDown);
 
         this.AddElement("Back-Button", new TextureButtonElement(
             buttonData,
@@ -375,6 +404,7 @@ public class LevelEditorGui : Gui
         SetButtonLabel("Place-Button", _scene.SelectedTool == EditorTool.Place ? "[Place]" : "Place");
         SetButtonLabel("Eraser-Button", _scene.SelectedTool == EditorTool.Eraser ? "[Eraser]" : "Eraser");
         ToggleElement("Moving-Block-Speed-Drop-Down", _scene.SelectedPlaceable == PlaceableType.MovingBlock);
+        ToggleElement("Placeable-Depth-Drop-Down", true);
         SetStatus(_scene.GetEditorStatusMessage());
     }
 
@@ -467,6 +497,21 @@ public class LevelEditorGui : Gui
     {
         string value = text.Replace("Speed", string.Empty, StringComparison.OrdinalIgnoreCase).Trim();
         return float.TryParse(value, out speed);
+    }
+
+    private static List<LabelData> GetDepthOptions(float selectedDepth)
+    {
+        float[] values = [selectedDepth, 0.1F, 0.2F, 0.3F, 0.4F, 0.5F, 0.6F, 0.7F, 0.8F, 0.9F];
+        return values
+            .Distinct()
+            .Select(depth => new LabelData(ContentRegistry.Fontoe, $"Depth {depth:0.0}", 18))
+            .ToList();
+    }
+
+    private static bool TryParseDepth(string text, out float depth)
+    {
+        string value = text.Replace("Depth", string.Empty, StringComparison.OrdinalIgnoreCase).Trim();
+        return float.TryParse(value, out depth);
     }
 
     private static List<LabelData> GetNextLevelOptions(string selectedLevelName)

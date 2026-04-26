@@ -10,13 +10,18 @@ namespace Pixelis.CSharp.Entities;
 
 public class WinFlag : Entity
 {
-    public WinFlag(Transform transform) : base(transform, "flag") { }
+    private readonly float _layerDepth;
+
+    public WinFlag(Transform transform, float layerDepth = 0.5F) : base(transform, "flag")
+    {
+        _layerDepth = layerDepth;
+    }
 
     protected override void Init()
     {
         base.Init();
         
-        this.AddComponent(new Sprite(ContentRegistry.WinFlag, Vector2.Zero));
+        this.AddComponent(new Sprite(ContentRegistry.WinFlag, Vector2.Zero, layerDepth: _layerDepth));
         
         RigidBody2D body = new RigidBody2D(new BodyDefinition()
         {

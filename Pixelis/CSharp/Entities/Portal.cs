@@ -16,6 +16,7 @@ public class Portal : Entity
     
     private Sprite _sprite;
     private Color? _color;
+    private readonly float _layerDepth;
     private float _timer;
     private int _frame;
     
@@ -23,17 +24,18 @@ public class Portal : Entity
     private const float FrameTime = 0.15f;
     private const int TotalFrames = 6;
     
-    public Portal(Transform transform, Vector2 teleportPos, Color? color = null) : base(transform, "portal")
+    public Portal(Transform transform, Vector2 teleportPos, Color? color = null, float layerDepth = 0.5F) : base(transform, "portal")
     {
         this.TeleportPos = teleportPos;
         this._color = color;
+        this._layerDepth = layerDepth;
     }
     
     protected override void Init()
     {
         base.Init();
 
-        this._sprite = new Sprite(ContentRegistry.Portal, new Vector2(80, -8), color: this._color);
+        this._sprite = new Sprite(ContentRegistry.Portal, new Vector2(80, -8), color: this._color, layerDepth: this._layerDepth);
         this.AddComponent(this._sprite);
         
         RigidBody2D body = new RigidBody2D(new BodyDefinition()

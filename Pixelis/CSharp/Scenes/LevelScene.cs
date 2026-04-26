@@ -134,12 +134,12 @@ public abstract class LevelScene : Scene
     
     protected abstract void OnLevelWon();
     
-    protected void CreatePlatform(int blockPosX, int blockPosY, int length)
+    protected void CreatePlatform(int blockPosX, int blockPosY, int length, float layerDepth = 0.5F)
     {
         for (int i = 0; i < length; i++)
         {
             Entity element = new Entity(new Transform() { Translation = new Vector3(blockPosX * 16 + (16 * i), blockPosY * 16, 0) });
-            element.AddComponent(new Sprite(ContentRegistry.Sprite, Vector2.Zero));
+            element.AddComponent(new Sprite(ContentRegistry.Sprite, Vector2.Zero, layerDepth: layerDepth));
             element.AddComponent(new RigidBody2D(new BodyDefinition() { Type = BodyType.Static }, new PolygonShape2D(Polygon.MakeBox(8, 8), new ShapeDef()
             {
                 EnableContactEvents = true,
@@ -149,14 +149,14 @@ public abstract class LevelScene : Scene
         }
     }
 
-    protected void CreateMovingPlatform(int blockPosX, int blockPosY, int length, int targetBlockPosX, int targetBlockPosY, float speed) {
+    protected void CreateMovingPlatform(int blockPosX, int blockPosY, int length, int targetBlockPosX, int targetBlockPosY, float speed, float layerDepth = 0.5F) {
         for (int i = 0; i < length; i++) {
-            MovingBlock movingBlock = new MovingBlock(blockPosX + i, blockPosY, targetBlockPosX + i, targetBlockPosY, speed);
+            MovingBlock movingBlock = new MovingBlock(blockPosX + i, blockPosY, targetBlockPosX + i, targetBlockPosY, speed, layerDepth);
             this.AddEntity(movingBlock);
         }
     }
 
-    protected void CreateStair(int blockPosX, int blockPosY, int length, StairType stairType)
+    protected void CreateStair(int blockPosX, int blockPosY, int length, StairType stairType, float layerDepth = 0.5F)
     {
         for (int i = 0; i < length; i++)
         {
@@ -173,7 +173,7 @@ public abstract class LevelScene : Scene
             }
             
             Entity element = new Entity(new Transform() { Translation = new Vector3(position, 0) });
-            element.AddComponent(new Sprite(ContentRegistry.Sprite, Vector2.Zero));
+            element.AddComponent(new Sprite(ContentRegistry.Sprite, Vector2.Zero, layerDepth: layerDepth));
             element.AddComponent(new RigidBody2D(new BodyDefinition() { Type = BodyType.Static }, new PolygonShape2D(Polygon.MakeBox(8, 8), new ShapeDef()
             {
                 EnableContactEvents = true,
@@ -183,78 +183,78 @@ public abstract class LevelScene : Scene
         }
     }
 
-    protected void CreateWinFlag(int blockPosX, int blockPosY)
+    protected void CreateWinFlag(int blockPosX, int blockPosY, float layerDepth = 0.5F)
     {
-        WinFlag winFlag = new WinFlag(new Transform() { Translation = new Vector3(blockPosX * 16 + 7, (blockPosY * 16) - 16, 0) });
+        WinFlag winFlag = new WinFlag(new Transform() { Translation = new Vector3(blockPosX * 16 + 7, (blockPosY * 16) - 16, 0) }, layerDepth);
         this.AddEntity(winFlag);
     }
 
-    protected void CreateTree(int blockPosX, int blockPosY)
+    protected void CreateTree(int blockPosX, int blockPosY, float layerDepth = 0.4F)
     {
         Entity entity = new Entity(new Transform() { Translation = new Vector3(blockPosX * 16, blockPosY * 16 - 20.5F, 0) });
-        entity.AddComponent(new Sprite(ContentRegistry.TreeBig, Vector2.Zero, layerDepth: 0.4F));
+        entity.AddComponent(new Sprite(ContentRegistry.TreeBig, Vector2.Zero, layerDepth: layerDepth));
         this.AddEntity(entity);
     }
 
-    protected void CreateTreeDead(int blockPosX, int blockPosY)
+    protected void CreateTreeDead(int blockPosX, int blockPosY, float layerDepth = 0.4F)
     {
         Entity entity = new Entity(new Transform() { Translation = new Vector3(blockPosX * 16, blockPosY * 16 - 11, 0) });
-        entity.AddComponent(new Sprite(ContentRegistry.TreeBigDead, Vector2.Zero, layerDepth: 0.4F));
+        entity.AddComponent(new Sprite(ContentRegistry.TreeBigDead, Vector2.Zero, layerDepth: layerDepth));
         this.AddEntity(entity);
     }
     
-    protected void CreateFlowerOrange(int blockPosX, int blockPosY)
+    protected void CreateFlowerOrange(int blockPosX, int blockPosY, float layerDepth = 0.4F)
     {
         Entity entity = new Entity(new Transform() { Translation = new Vector3(blockPosX * 16, blockPosY * 16 - 8, 0) });
-        entity.AddComponent(new Sprite(ContentRegistry.PlantFlower, Vector2.Zero, layerDepth: 0.4F));
+        entity.AddComponent(new Sprite(ContentRegistry.PlantFlower, Vector2.Zero, layerDepth: layerDepth));
         this.AddEntity(entity);
     }
     
-    protected void CreateBush(int blockPosX, int blockPosY)
+    protected void CreateBush(int blockPosX, int blockPosY, float layerDepth = 0.4F)
     {
         Entity entity = new Entity(new Transform() { Translation = new Vector3(blockPosX * 16, blockPosY * 16 + 1, 0) });
-        entity.AddComponent(new Sprite(ContentRegistry.Bush, Vector2.Zero, layerDepth: 0.4F));
+        entity.AddComponent(new Sprite(ContentRegistry.Bush, Vector2.Zero, layerDepth: layerDepth));
         this.AddEntity(entity);
     }
     
-    protected void CreatePlantSunFlower(int blockPosX, int blockPosY)
+    protected void CreatePlantSunFlower(int blockPosX, int blockPosY, float layerDepth = 0.4F)
     {
         Entity entity = new Entity(new Transform() { Translation = new Vector3(blockPosX * 16, blockPosY * 16 - 8, 0) });
-        entity.AddComponent(new Sprite(ContentRegistry.PlantSunFlower, Vector2.Zero, layerDepth: 0.4F));
+        entity.AddComponent(new Sprite(ContentRegistry.PlantSunFlower, Vector2.Zero, layerDepth: layerDepth));
         this.AddEntity(entity);
     }
     
-    protected void CreateBushDead(int blockPosX, int blockPosY)
+    protected void CreateBushDead(int blockPosX, int blockPosY, float layerDepth = 0.4F)
     {
         Entity entity = new Entity(new Transform() { Translation = new Vector3(blockPosX * 16, blockPosY * 16, 0) });
-        entity.AddComponent(new Sprite(ContentRegistry.BushDead, Vector2.Zero, layerDepth: 0.4F));
+        entity.AddComponent(new Sprite(ContentRegistry.BushDead, Vector2.Zero, layerDepth: layerDepth));
         this.AddEntity(entity);
     }
     
-    protected void CreateRockWithGrass(int blockPosX, int blockPosY)
+    protected void CreateRockWithGrass(int blockPosX, int blockPosY, float layerDepth = 0.4F)
     {
         Entity entity = new Entity(new Transform() { Translation = new Vector3(blockPosX * 16, blockPosY * 16, 0) });
-        entity.AddComponent(new Sprite(ContentRegistry.RockGrass, Vector2.Zero, layerDepth: 0.4F));
+        entity.AddComponent(new Sprite(ContentRegistry.RockGrass, Vector2.Zero, layerDepth: layerDepth));
         this.AddEntity(entity);
     }
     
-    protected void CreatePlantFlowerRed(int blockPosX, int blockPosY)
+    protected void CreatePlantFlowerRed(int blockPosX, int blockPosY, float layerDepth = 0.4F)
     {
         Entity entity = new Entity(new Transform() { Translation = new Vector3(blockPosX * 16, blockPosY * 16, 0) });
-        entity.AddComponent(new Sprite(ContentRegistry.PlantFlowerRed, Vector2.Zero, layerDepth: 0.4F));
+        entity.AddComponent(new Sprite(ContentRegistry.PlantFlowerRed, Vector2.Zero, layerDepth: layerDepth));
         this.AddEntity(entity);
     }
     
-    protected void CreateOakLog(int blockPosX, int blockPosY)
+    protected void CreateOakLog(int blockPosX, int blockPosY, float layerDepth = 0.4F)
     {
         Entity entity = new Entity(new Transform() { Translation = new Vector3(blockPosX * 16, blockPosY * 16, 0) });
-        entity.AddComponent(new Sprite(ContentRegistry.OakLog, Vector2.Zero, layerDepth: 0.4F));
+        entity.AddComponent(new Sprite(ContentRegistry.OakLog, Vector2.Zero, layerDepth: layerDepth));
         this.AddEntity(entity);
     }
 
-    protected void CreatePortal(int blockPosX, int blockPosY, int teleportPosX, int teleportPosY, Color? color = null)
+    protected void CreatePortal(int blockPosX, int blockPosY, int teleportPosX, int teleportPosY, Color? color = null, float layerDepth = 0.5F)
     {
-        Portal portal = new Portal(new Transform() { Translation = new Vector3(blockPosX * 16, blockPosY * 16, 0) }, new Vector2(teleportPosX * 16, teleportPosY * 16), color);
+        Portal portal = new Portal(new Transform() { Translation = new Vector3(blockPosX * 16, blockPosY * 16, 0) }, new Vector2(teleportPosX * 16, teleportPosY * 16), color, layerDepth);
         this.AddEntity(portal);
     }
     

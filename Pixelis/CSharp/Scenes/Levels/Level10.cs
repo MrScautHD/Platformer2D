@@ -3,7 +3,9 @@ using Bliss.CSharp.Colors;
 using Bliss.CSharp.Textures;
 using Bliss.CSharp.Transformations;
 using Pixelis.CSharp.Entities;
+using Pixelis.CSharp.GUIs.Loading;
 using Sparkle.CSharp.Scenes;
+using Sparkle.CSharp.Utils.Async;
 
 namespace Pixelis.CSharp.Scenes.Levels;
 
@@ -41,12 +43,14 @@ public class Level10 : LevelScene
 
     protected override void OnLevelWon()
     {
-        // Da dies das neueste Level ist, laden wir es bei Sieg neu oder gehen zu Level 8
         if (NetworkManager.Client == null || !NetworkManager.Client.IsConnected)
         {
-            SceneManager.LoadScene(new Level1());
-            Player player = new Player(new Transform() { Translation = new Vector3(0, -16 * 2, 0) });
-            SceneManager.ActiveScene?.AddEntity(player);
+            AsyncOperation operation11 = SceneManager.LoadSceneAsync(new Level11(), new ProgressBarLoadingGui("Loading"));
+            operation11.Completed += success =>
+            {
+                Player player = new Player(new Transform() { Translation = new Vector3(0, -16 * 2, 0) });
+                SceneManager.ActiveScene?.AddEntity(player);
+            };
         }
     }
     
