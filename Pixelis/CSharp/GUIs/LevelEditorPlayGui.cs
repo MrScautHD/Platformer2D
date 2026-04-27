@@ -46,12 +46,23 @@ public class LevelEditorPlayGui : Gui
 
     protected override void Draw(GraphicsContext context, Framebuffer framebuffer)
     {
+        float scale = this.ScaleFactor;
+        Vector2 snappedWindowSize = GetSnappedWindowSize(scale);
+        Vector2 panelSize = new Vector2(200, 84) * scale;
+
         context.PrimitiveBatch.Begin(context.CommandList, framebuffer.OutputDescription);
         context.PrimitiveBatch.DrawFilledRectangle(
-            new RectangleF(GlobalGraphicsAssets.Window.GetWidth() - 200, 0, 200, 84),
+            new RectangleF(snappedWindowSize.X - panelSize.X, 0, panelSize.X, panelSize.Y),
             color: new Color(15, 15, 15, 160));
         context.PrimitiveBatch.End();
 
         base.Draw(context, framebuffer);
+    }
+
+    private static Vector2 GetSnappedWindowSize(float scale)
+    {
+        float width = MathF.Floor(GlobalGraphicsAssets.Window.GetWidth() / scale) * scale;
+        float height = MathF.Floor(GlobalGraphicsAssets.Window.GetHeight() / scale) * scale;
+        return new Vector2(width, height);
     }
 }

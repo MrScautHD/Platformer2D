@@ -68,6 +68,7 @@ public class Player : Entity
 
     // Level completion
     private bool _hasCompletedLevel = false;
+    private bool _hasReportedDeath;
 
     private const float BaseMaxSpeed  = 50f;
     private const float BaseGravity   = 15.5f;
@@ -86,7 +87,7 @@ public class Player : Entity
         base.Init();
         this.PoseType = PlayerPoseType.RightIdle;
         this.NetworkedPoseType = PlayerPoseType.RightIdle;
-        this._sprite = new Sprite(ContentRegistry.PlayerIdleRight, new Vector2(168, -2), layerDepth: 0.6F);
+        this._sprite = new Sprite(ContentRegistry.PlayerIdleRight, new Vector2(168, -2), layerDepth: 1);
         this.AddComponent(this._sprite);
 
         RigidBody2D body = new RigidBody2D(new BodyDefinition()
@@ -441,7 +442,7 @@ public class Player : Entity
             Vector2 scale = new Vector2(0.25F, 0.25F);
             Vector2 textSize = ContentRegistry.Fontoe.MeasureText(this.UserName, 18, scale);
             Vector2 namePos = new Vector2(this.LocalTransform.Translation.X - textSize.X / 2.0F, this.LocalTransform.Translation.Y - 22);
-            context.SpriteBatch.DrawText(ContentRegistry.Fontoe, this.UserName, namePos, 18, scale: scale, color: Color.Gray);
+            context.SpriteBatch.DrawText(ContentRegistry.Fontoe, this.UserName, namePos, 18, scale: scale, color: Color.Gray, layerDepth:1);
             context.SpriteBatch.End();
         }
     }
@@ -450,8 +451,19 @@ public class Player : Entity
     {
         if (!IsLocalPlayer) return;
 
-        if (this.LocalTransform.Translation.Y >= 5 * 16)
-            GuiManager.SetGui(new GameOverGui());
+        if (this.LocalTransform.Translation.Y < DEATH_Y)
+        {
+            _hasReportedDeath = false;
+            return;
+        }
+
+        if (!_hasReportedDeath)
+        {
+            _hasReportedDeath = true;
+            NetworkManager.NotifyPlayerDied();
+        }
+
+        GuiManager.SetGui(new GameOverGui());
     }
 
     private void ContactBeginSensorTouch(SensorBeginTouchEvent e)

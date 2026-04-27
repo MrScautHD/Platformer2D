@@ -1,8 +1,5 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.14.37203.1 d17.14
-MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pixelis", "Pixelis\Pixelis.csproj", "{E7B58EB8-0302-45B9-B722-CFF1B0DE72B0}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sparkle", "Sparkle\src\Sparkle\Sparkle.csproj", "{7ABBB9C5-A8A8-418B-9146-48F0FEB310EA}"
@@ -58,8 +55,5 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {F9083132-D5BC-4EC9-B064-F2827B7D0B7A}
 	EndGlobalSection
 EndGlobal

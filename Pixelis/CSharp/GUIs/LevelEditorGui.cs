@@ -359,36 +359,54 @@ public class LevelEditorGui : Gui
 
     protected override void Draw(GraphicsContext context, Framebuffer framebuffer)
     {
+        float scale = this.ScaleFactor;
+        Vector2 snappedWindowSize = GetSnappedWindowSize(scale);
+        float topBarHeight = 84 * scale;
+        float bottomBarHeight = 130 * scale;
+
         context.PrimitiveBatch.Begin(context.CommandList, framebuffer.OutputDescription);
         context.PrimitiveBatch.DrawFilledRectangle(
-            new RectangleF(0, 0, GlobalGraphicsAssets.Window.GetWidth(), 84),
+            new RectangleF(0, 0, snappedWindowSize.X, topBarHeight),
             color: new Color(15, 15, 15, 160));
         context.PrimitiveBatch.DrawFilledRectangle(
-            new RectangleF(0, GlobalGraphicsAssets.Window.GetHeight() - 130, GlobalGraphicsAssets.Window.GetWidth(), 130),
+            new RectangleF(0, snappedWindowSize.Y - bottomBarHeight, snappedWindowSize.X, bottomBarHeight),
             color: new Color(15, 15, 15, 160));
 
         if (IsSaveDialogOpen)
         {
-            float width = 420;
-            float height = 280;
-            float x = (GlobalGraphicsAssets.Window.GetWidth() - width) / 2F;
-            float y = (GlobalGraphicsAssets.Window.GetHeight() - height) / 2F;
+            Vector2 modalSize = new Vector2(420, 280) * scale;
+            Vector2 modalPosition = GetCenteredRectanglePosition(snappedWindowSize, modalSize, scale);
 
             context.PrimitiveBatch.DrawFilledRectangle(
                 new RectangleF(0, 0, GlobalGraphicsAssets.Window.GetWidth(), GlobalGraphicsAssets.Window.GetHeight()),
                 color: new Color(0, 0, 0, 150));
             context.PrimitiveBatch.DrawFilledRectangle(
-                new RectangleF(x, y, width, height),
+                new RectangleF(modalPosition.X, modalPosition.Y, modalSize.X, modalSize.Y),
                 color: new Color(35, 35, 35, 235));
             context.PrimitiveBatch.DrawEmptyRectangle(
-                new RectangleF(x, y, width, height),
-                3,
+                new RectangleF(modalPosition.X, modalPosition.Y, modalSize.X, modalSize.Y),
+                3 * scale,
                 color: Color.White);
         }
 
         context.PrimitiveBatch.End();
 
         base.Draw(context, framebuffer);
+    }
+
+    private static Vector2 GetSnappedWindowSize(float scale)
+    {
+        float width = MathF.Floor(GlobalGraphicsAssets.Window.GetWidth() / scale) * scale;
+        float height = MathF.Floor(GlobalGraphicsAssets.Window.GetHeight() / scale) * scale;
+        return new Vector2(width, height);
+    }
+
+    private static Vector2 GetCenteredRectanglePosition(Vector2 windowSize, Vector2 rectangleSize, float scale)
+    {
+        return new Vector2(
+            MathF.Floor((windowSize.X / 2.0F - rectangleSize.X / 2.0F) / scale) * scale,
+            MathF.Floor((windowSize.Y / 2.0F - rectangleSize.Y / 2.0F) / scale) * scale
+        );
     }
 
     public bool IsPointOverExtendedUi(Vector2 point)

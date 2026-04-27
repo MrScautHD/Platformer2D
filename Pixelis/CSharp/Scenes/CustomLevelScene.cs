@@ -441,9 +441,10 @@ public class CustomLevelScene : LevelScene
 
         float windowWidth = GlobalGraphicsAssets.Window.GetWidth();
         float windowHeight = GlobalGraphicsAssets.Window.GetHeight();
+        float uiScale = GuiManager.ActiveGui?.ScaleFactor ?? 1;
 
-        RectangleF topBarArea = new RectangleF(0, 0, windowWidth, 90);
-        RectangleF bottomBarArea = new RectangleF(0, windowHeight - 140, windowWidth, 140);
+        RectangleF topBarArea = new RectangleF(0, 0, windowWidth, 84 * uiScale);
+        RectangleF bottomBarArea = new RectangleF(0, windowHeight - (130 * uiScale), windowWidth, 130 * uiScale);
 
         return Contains(topBarArea, mousePosition)
                || Contains(bottomBarArea, mousePosition);

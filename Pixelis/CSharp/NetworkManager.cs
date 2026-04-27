@@ -27,6 +27,7 @@ public static class NetworkManager
     
     // Dictionary to track player usernames by their client ID
     public static Dictionary<ushort, string> PlayerUsernames = new(); 
+    private static readonly HashSet<ushort> _announcedDisconnects = new();
     
     // Flag to prevent showing HostLeavedGui during level transitions
     private static bool _isLevelTransition = false;
@@ -44,6 +45,17 @@ public static class NetworkManager
     public static event Action<string>? ChatMessageReceived;
     public static event Action? ChatClearedReceived;
     private static bool _chatInputBlocked;
+    private const ushort InitialConnectionMessageId = 1;
+    private const ushort PositionUpdateMessageId = 2;
+    private const ushort SpawnPlayerMessageId = 3;
+    private const ushort DespawnPlayerMessageId = 4;
+    private const ushort ClientDisconnectMessageId = 5;
+    private const ushort LevelCompletionMessageId = 6;
+    private const ushort LevelTransitionMessageId = 7;
+    private const ushort UsernameMessageId = 8;
+    private const ushort ChatMessageId = 9;
+    private const ushort ClearChatMessageId = 10;
+    private const ushort PlayerDeathMessageId = 11;
 
     public static void Update()
     {
@@ -89,6 +101,9 @@ public static class NetworkManager
     private static bool TryStartServer(ushort slots, out string errorMessage)
     {
         errorMessage = string.Empty;
+        NetworkedPlayers.Clear();
+        PlayerUsernames.Clear();
+        _announcedDisconnects.Clear();
 
         try
         {
@@ -115,19 +130,12 @@ public static class NetworkManager
         {
             Logger.Info($"[SERVER] Client {args.Client.Id} connected");
 
-            Message message = Message.Create(MessageSendMode.Reliable, 1);
+            Message message = Message.Create(MessageSendMode.Reliable, InitialConnectionMessageId);
             message.AddString(_currentLevel);
             message.AddString(_currentLevelPayload);
             message.AddUShort(args.Client.Id);
 
-            List<ushort> existingPlayerIds = new List<ushort>();
-            for (ushort i = 1; i < args.Client.Id; i++)
-            {
-                if (NetworkedPlayers.ContainsKey(i))
-                {
-                    existingPlayerIds.Add(i);
-                }
-            }
+            List<ushort> existingPlayerIds = GetRegisteredServerPlayerIds(args.Client.Id);
 
             Logger.Info($"[SERVER] Sending {existingPlayerIds.Count} existing players to client {args.Client.Id}");
 
@@ -145,10 +153,12 @@ public static class NetworkManager
         {
             Logger.Info($"[SERVER] Client {args.Client.Id} disconnected - preparing despawn");
 
+            BroadcastLeaveIfNeeded(args.Client.Id);
+
             NetworkedPlayers.Remove(args.Client.Id);
             PlayerUsernames.Remove(args.Client.Id);
 
-            Message despawnMessage = Message.Create(MessageSendMode.Reliable, 4);
+            Message despawnMessage = Message.Create(MessageSendMode.Reliable, DespawnPlayerMessageId);
             despawnMessage.AddUShort(args.Client.Id);
 
             Server.SendToAll(despawnMessage);
@@ -167,23 +177,26 @@ public static class NetworkManager
         
         switch (messageId)
         {
-            case 2: // Position update
+            case PositionUpdateMessageId: // Position update
                 HandleServerPositionUpdate(e.Message, e.FromConnection.Id);
                 break;
-            case 5: // Client disconnect request
+            case ClientDisconnectMessageId: // Client disconnect request
                 HandleClientDisconnectRequest(e.Message, e.FromConnection.Id);
                 break;
-            case 6: // Level completion
+            case LevelCompletionMessageId: // Level completion
                 HandleLevelCompletion(e.Message, e.FromConnection.Id);
                 break;
-            case 8: // Username from client
+            case UsernameMessageId: // Username from client
                 HandleClientUsernameMessage(e.Message, e.FromConnection.Id);
                 break;
-            case 9: // Chat message from client
+            case ChatMessageId: // Chat message from client
                 HandleClientChatMessage(e.Message, e.FromConnection.Id);
                 break;
-            case 10: // Clear chat command from host
+            case ClearChatMessageId: // Clear chat command from host
                 HandleServerClearChat(e.FromConnection.Id);
+                break;
+            case PlayerDeathMessageId: // Player death notification
+                HandlePlayerDeathMessage(e.FromConnection.Id);
                 break;
         }
     }
@@ -196,7 +209,7 @@ public static class NetworkManager
 
         Logger.Info($"[SERVER] Chat from {fromClientId}: {chatText}");
 
-        Message broadcastMessage = Message.Create(MessageSendMode.Reliable, 9);
+        Message broadcastMessage = Message.Create(MessageSendMode.Reliable, ChatMessageId);
         broadcastMessage.AddString(fullMessage);
         Server?.SendToAll(broadcastMessage);
     }
@@ -210,7 +223,7 @@ public static class NetworkManager
 
         Logger.Info("[SERVER] Host requested chat clear");
 
-        Message clearMessage = Message.Create(MessageSendMode.Reliable, 10);
+        Message clearMessage = Message.Create(MessageSendMode.Reliable, ClearChatMessageId);
         Server.SendToAll(clearMessage);
     }
     
@@ -223,14 +236,24 @@ public static class NetworkManager
         
         // Store the username
         PlayerUsernames[fromClientId] = username;
+        _announcedDisconnects.Remove(fromClientId);
         
         // Now notify all other clients about the new player with their username
-        Message spawnMessage = Message.Create(MessageSendMode.Reliable, 3);
+        Message spawnMessage = Message.Create(MessageSendMode.Reliable, SpawnPlayerMessageId);
         spawnMessage.AddUShort(fromClientId);
         spawnMessage.AddString(username);
         Server.SendToAll(spawnMessage, fromClientId);
+
+        BroadcastSystemChatMessage($"{username} joined the server.");
         
         Logger.Info($"[SERVER] Notified all clients about new player {fromClientId} ({username})");
+    }
+
+    private static void HandlePlayerDeathMessage(ushort fromClientId)
+    {
+        string username = PlayerUsernames.TryGetValue(fromClientId, out string? name) ? name : $"Player {fromClientId}";
+        Logger.Info($"[SERVER] Death notification from {fromClientId} ({username})");
+        BroadcastSystemChatMessage($"{username} died.");
     }
     
     // Handle level completion from a client
@@ -244,7 +267,7 @@ public static class NetworkManager
         _currentLevelPayload = CreateLevelPayload(nextLevel);
         
         // Remember all connected player IDs before transition
-        List<ushort> connectedPlayers = new List<ushort>(NetworkedPlayers.Keys);
+        List<ushort> connectedPlayers = GetRegisteredServerPlayerIds();
         Logger.Info($"[SERVER] Current players before transition: {string.Join(", ", connectedPlayers)}");
         
         // Send level transition message to ALL clients
@@ -276,6 +299,7 @@ public static class NetworkManager
         }
         
         // Remove from server's player list
+        BroadcastLeaveIfNeeded(playerId);
         NetworkedPlayers.Remove(playerId);
         PlayerUsernames.Remove(playerId);
         
@@ -299,25 +323,25 @@ public static class NetworkManager
         
         switch (messageId)
         {
-            case 1: // Initial connection
+            case InitialConnectionMessageId: // Initial connection
                 HandleInitialConnection(e.Message);
                 break;
-            case 2: // Position update
+            case PositionUpdateMessageId: // Position update
                 HandlePlayerPositionUpdate(e.Message);
                 break;
-            case 3: // Spawn player
+            case SpawnPlayerMessageId: // Spawn player
                 HandlePlayerSpawn(e.Message);
                 break;
-            case 4: // Despawn player
+            case DespawnPlayerMessageId: // Despawn player
                 HandlePlayerDespawn(e.Message);
                 break;
-            case 7: // Level transition
+            case LevelTransitionMessageId: // Level transition
                 HandleLevelTransition(e.Message);
                 break;
-            case 9: // Chat message
+            case ChatMessageId: // Chat message
                 HandleChatMessage(e.Message);
                 break;
-            case 10: // Clear chat
+            case ClearChatMessageId: // Clear chat
                 HandleClearChat();
                 break;
             default:
@@ -356,7 +380,6 @@ public static class NetworkManager
             {
                 SceneManager.ActiveScene.RemoveEntity(kvp.Value);
             }
-            kvp.Value.Dispose();
         }
         NetworkedPlayers.Clear();
 
@@ -491,10 +514,11 @@ public static class NetworkManager
         // Clean up all networked players
         foreach (var player in NetworkedPlayers.Values)
         {
-            player.Dispose();
+            SceneManager.ActiveScene?.RemoveEntity(player);
         }
         NetworkedPlayers.Clear();
         PlayerUsernames.Clear();
+        _announcedDisconnects.Clear();
      
         GuiManager.SetGui(new HostLeavedGui());
     }
@@ -509,7 +533,7 @@ public static class NetworkManager
             Logger.Info("[NETWORK] Client sending disconnect message to server");
             
             // Send explicit disconnect message to server
-            Message disconnectMessage = Message.Create(MessageSendMode.Reliable, 5);
+            Message disconnectMessage = Message.Create(MessageSendMode.Reliable, ClientDisconnectMessageId);
             disconnectMessage.AddUShort(LocalPlayerId);
             Client.Send(disconnectMessage);
             
@@ -532,7 +556,7 @@ public static class NetworkManager
                 Logger.Info("[NETWORK] Host client sending disconnect message");
                 
                 // Send explicit disconnect message
-                Message disconnectMessage = Message.Create(MessageSendMode.Reliable, 5);
+                Message disconnectMessage = Message.Create(MessageSendMode.Reliable, ClientDisconnectMessageId);
                 disconnectMessage.AddUShort(LocalPlayerId);
                 Client.Send(disconnectMessage);
                 
@@ -563,7 +587,7 @@ public static class NetworkManager
         // Clean up all networked players
         foreach (var player in NetworkedPlayers.Values)
         {
-            player.Dispose();
+            SceneManager.ActiveScene?.RemoveEntity(player);
         }
         
         NetworkedPlayers.Clear();
@@ -586,7 +610,7 @@ public static class NetworkManager
         // Send username to server now that we have our player ID
         if (Client != null && Client.IsConnected)
         {
-            Message usernameMessage = Message.Create(MessageSendMode.Reliable, 8);
+            Message usernameMessage = Message.Create(MessageSendMode.Reliable, UsernameMessageId);
             usernameMessage.AddString(_pendingUsername);
             Client.Send(usernameMessage);
             
@@ -722,8 +746,6 @@ public static class NetworkManager
                 Logger.Info($"[DESPAWN] Removed player {playerId} from scene");
             }
             
-            // Then dispose and remove from dictionary
-            playerToRemove.Dispose();
             NetworkedPlayers.Remove(playerId);
             PlayerUsernames.Remove(playerId);
             
@@ -764,13 +786,27 @@ public static class NetworkManager
 
         return LevelFactory.CreateByName(levelName);
     }
+
+    private static List<ushort> GetRegisteredServerPlayerIds(ushort? excludePlayerId = null)
+    {
+        IEnumerable<ushort> playerIds = PlayerUsernames.Keys;
+
+        if (excludePlayerId.HasValue)
+        {
+            playerIds = playerIds.Where(id => id != excludePlayerId.Value);
+        }
+
+        return playerIds
+            .OrderBy(id => id)
+            .ToList();
+    }
     
     // Send player position update
     public static void SendPlayerPosition(Vector3 position, PlayerPoseType poseType)
     {
         if (Client != null && Client.IsConnected)
         {
-            Message message = Message.Create(MessageSendMode.Unreliable, 2);
+            Message message = Message.Create(MessageSendMode.Unreliable, PositionUpdateMessageId);
             message.AddUShort(LocalPlayerId);
             message.AddFloat(position.X);
             message.AddFloat(position.Y);
@@ -787,10 +823,26 @@ public static class NetworkManager
         {
             Logger.Info($"[CLIENT] Notifying server of level completion, next level: {nextLevel}");
             
-            Message message = Message.Create(MessageSendMode.Reliable, 6);
+            Message message = Message.Create(MessageSendMode.Reliable, LevelCompletionMessageId);
             message.AddString(nextLevel);
             Client.Send(message);
         }
+    }
+
+    public static void NotifyPlayerDied()
+    {
+        string username = ResolveLocalUsername();
+
+        if (Client != null && Client.IsConnected)
+        {
+            Logger.Info($"[CLIENT] Reporting death for {username}");
+
+            Message message = Message.Create(MessageSendMode.Reliable, PlayerDeathMessageId);
+            Client.Send(message);
+            return;
+        }
+
+        ChatMessageReceived?.Invoke($"{username} died.");
     }
 
     public static void SubmitChatInput(string input)
@@ -806,7 +858,7 @@ public static class NetworkManager
             {
                 if (Client != null && Client.IsConnected)
                 {
-                    Message message = Message.Create(MessageSendMode.Reliable, 10);
+                    Message message = Message.Create(MessageSendMode.Reliable, ClearChatMessageId);
                     Client.Send(message);
                 }
                 else
@@ -823,7 +875,7 @@ public static class NetworkManager
 
         if (Client != null && Client.IsConnected)
         {
-            Message message = Message.Create(MessageSendMode.Reliable, 9);
+            Message message = Message.Create(MessageSendMode.Reliable, ChatMessageId);
             message.AddString(input);
             Client.Send(message);
         }
@@ -857,5 +909,29 @@ public static class NetworkManager
         }
 
         return "Local";
+    }
+
+    private static void BroadcastSystemChatMessage(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        Message broadcastMessage = Message.Create(MessageSendMode.Reliable, ChatMessageId);
+        broadcastMessage.AddString(message);
+        Server?.SendToAll(broadcastMessage);
+    }
+
+    private static void BroadcastLeaveIfNeeded(ushort playerId)
+    {
+        if (_announcedDisconnects.Contains(playerId))
+        {
+            return;
+        }
+
+        string username = PlayerUsernames.TryGetValue(playerId, out string? name) ? name : $"Player {playerId}";
+        _announcedDisconnects.Add(playerId);
+        BroadcastSystemChatMessage($"{username} left the server.");
     }
 }
