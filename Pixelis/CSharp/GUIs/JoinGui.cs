@@ -6,6 +6,7 @@ using Bliss.CSharp.Interact.Keyboards;
 using Bliss.CSharp.Textures;
 using Bliss.CSharp.Transformations;
 using Bliss.CSharp.Windowing;
+using Riptide;
 using Sparkle.CSharp.Graphics;
 using Sparkle.CSharp.GUI;
 using Sparkle.CSharp.GUI.Elements;
@@ -17,9 +18,15 @@ namespace Pixelis.CSharp.GUIs;
 
 public class JoinGui : Gui
 {
+    private const string OfficialServer1Address = "92.204.41.78:7777";
     private bool _isConnecting = false;
     private string _errorMessage = "";
     private float _errorDisplayTime = 0f;
+    private const float OfficialServerPanelLeft = 20F;
+    private readonly Vector2 _officialServerPanelSize = new Vector2(210, 250);
+    private readonly string[] _officialServerStatuses = ["off", "off", "off", "off", "off"];
+    private Task? _serverStatusProbeTask;
+    private float _serverStatusProbeCooldown;
     
     public JoinGui () : base("Join", null) { }
 
@@ -29,6 +36,9 @@ public class JoinGui : Gui
         
         LabelData labelData = new LabelData(ContentRegistry.Fontoe, "Join", 18);
         this.AddElement("Titel", new LabelElement(labelData, Anchor.TopCenter, new Vector2(0, 50), new Vector2(5, 5)));
+
+        LabelData officialServerListTitleData = new LabelData(ContentRegistry.Fontoe, "Official Servers", 18, color: Color.White);
+        this.AddElement("Official-Server-List-Title", new LabelElement(officialServerListTitleData, Anchor.CenterLeft, new Vector2(27, -107), new Vector2(1.2F, 1.2F)));
         
         TextureButtonData backButtonData = new TextureButtonData(ContentRegistry.UiButton, hoverColor: Color.LightGray, resizeMode: ResizeMode.NineSlice, borderInsets: new BorderInsets(12));
         LabelData backButtonLabelData = new LabelData(ContentRegistry.Fontoe, "Back", 18, hoverColor: Color.White);
@@ -79,6 +89,81 @@ public class JoinGui : Gui
         this.AddElement("Name-Text-Box", new TextureTextBoxElement(nameTextBoxData, nameTextBoxLabelData, nameHintTextBoxLabelData, Anchor.Center, new Vector2(120, -120), 15, TextAlignment.Center, new Vector2(0, 1), (12, 12), new Vector2(230, 30), rotation: 0, clickFunc: (element) => {
             return true;
         }));
+
+        TextureButtonData serverButtonData = new TextureButtonData(ContentRegistry.UiButton, hoverColor: Color.LightGray, resizeMode: ResizeMode.NineSlice, borderInsets: new BorderInsets(12));
+
+        this.AddElement("Official-Server-1-Button", new TextureButtonElement(
+            serverButtonData,
+            new LabelData(ContentRegistry.Fontoe, "Pixelis 1", 18, hoverColor: Color.White),
+            Anchor.CenterLeft,
+            new Vector2(40, -67),
+            size: new Vector2(170, 26),
+            textOffset: new Vector2(0, 1),
+            clickFunc: _ =>
+            {
+                if (!_isConnecting)
+                {
+                    TryJoinServerWithAddress(OfficialServer1Address);
+                }
+                return true;
+            }));
+
+        this.AddElement("Official-Server-2-Button", new TextureButtonElement(
+            serverButtonData,
+            new LabelData(ContentRegistry.Fontoe, "Pixelis 2", 18, hoverColor: Color.White),
+            Anchor.CenterLeft,
+            new Vector2(40, -35),
+            size: new Vector2(170, 26),
+            textOffset: new Vector2(0, 1),
+            clickFunc: _ =>
+            {
+                ShowComingSoonMessage();
+                return true;
+            }));
+
+        this.AddElement("Official-Server-3-Button", new TextureButtonElement(
+            serverButtonData,
+            new LabelData(ContentRegistry.Fontoe, "Pixelis 3", 18, hoverColor: Color.White),
+            Anchor.CenterLeft,
+            new Vector2(40, -3),
+            size: new Vector2(170, 26),
+            textOffset: new Vector2(0, 1),
+            clickFunc: _ =>
+            {
+                ShowComingSoonMessage();
+                return true;
+            }));
+
+        this.AddElement("Official-Server-4-Button", new TextureButtonElement(
+            serverButtonData,
+            new LabelData(ContentRegistry.Fontoe, "Pixelis 4", 18, hoverColor: Color.White),
+            Anchor.CenterLeft,
+            new Vector2(40, 29),
+            size: new Vector2(170, 26),
+            textOffset: new Vector2(0, 1),
+            clickFunc: _ =>
+            {
+                ShowComingSoonMessage();
+                return true;
+            }));
+
+        this.AddElement("Official-Server-5-Button", new TextureButtonElement(
+            serverButtonData,
+            new LabelData(ContentRegistry.Fontoe, "Pixelis 5", 18, hoverColor: Color.White),
+            Anchor.CenterLeft,
+            new Vector2(40, 61),
+            size: new Vector2(170, 26),
+            textOffset: new Vector2(0, 1),
+            clickFunc: _ =>
+            {
+                ShowComingSoonMessage();
+                return true;
+            }));
+
+        LabelData officialServerHintData = new LabelData(ContentRegistry.Fontoe, "2-5 coming soon", 18, color: Color.LightGray);
+        this.AddElement("Official-Server-Hint", new LabelElement(officialServerHintData, Anchor.CenterLeft, new Vector2(50, 95), new Vector2(1, 1)));
+        RefreshOfficialServerLabels();
+        QueueServerStatusProbe();
     }
     
     private void TryJoinServer()
@@ -86,31 +171,32 @@ public class JoinGui : Gui
         // Get IP from text box
         TextureTextBoxElement ipTextBox = (TextureTextBoxElement)this.GetElement("Texture-Text-Box");
         string ipAddress = ipTextBox.LabelData.Text.Trim();
-        
-        // Get username from text box
+        TryJoinServerWithAddress(string.IsNullOrWhiteSpace(ipAddress) ? "127.0.0.1:7777" : ipAddress);
+    }
+
+    private void TryJoinServerWithAddress(string ipAddress)
+    {
         TextureTextBoxElement nameTextBox = (TextureTextBoxElement)this.GetElement("Name-Text-Box");
         string username = nameTextBox.LabelData.Text.Trim();
-        
-        // Use default if empty
-        if (string.IsNullOrWhiteSpace(ipAddress))
-        {
-            ipAddress = "127.0.0.1:7777";
-        }
-        
+
         if (string.IsNullOrWhiteSpace(username))
         {
             username = "Player";
         }
-        
+
         _isConnecting = true;
         _errorMessage = "Connecting...";
         UpdateErrorLabel();
-        
-        // Set up connection callbacks
+
         NetworkManager.SetConnectionCallbacks(OnConnectionSuccess, OnConnectionFailed);
-        
-        // Attempt to join with username
         NetworkManager.JoinServer(ipAddress, username);
+    }
+
+    private void ShowComingSoonMessage()
+    {
+        _errorMessage = "This official server slot is coming soon.";
+        _errorDisplayTime = 3f;
+        UpdateErrorLabel();
     }
     
     private void OnConnectionSuccess()
@@ -138,6 +224,87 @@ public class JoinGui : Gui
             errorLabel.Data.Text = _errorMessage;
         }
     }
+
+    private void QueueServerStatusProbe()
+    {
+        _serverStatusProbeCooldown = 5f;
+        _serverStatusProbeTask = ProbeOfficialServerStatusesAsync();
+    }
+
+    private async Task ProbeOfficialServerStatusesAsync()
+    {
+        _officialServerStatuses[0] = await ProbeServerAsync(OfficialServer1Address) ? "on" : "off";
+        _officialServerStatuses[1] = "off";
+        _officialServerStatuses[2] = "off";
+        _officialServerStatuses[3] = "off";
+        _officialServerStatuses[4] = "off";
+        RefreshOfficialServerLabels();
+    }
+
+    private async Task<bool> ProbeServerAsync(string endpoint)
+    {
+        Client? probeClient = null;
+
+        try
+        {
+            probeClient = new Client();
+            TaskCompletionSource<bool> completionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            probeClient.Connected += (_, _) => completionSource.TrySetResult(true);
+            probeClient.ConnectionFailed += (_, _) => completionSource.TrySetResult(false);
+            probeClient.Disconnected += (_, _) => completionSource.TrySetResult(false);
+            probeClient.Connect(endpoint);
+
+            DateTime deadline = DateTime.UtcNow.AddSeconds(1.5);
+            while (!completionSource.Task.IsCompleted && DateTime.UtcNow < deadline)
+            {
+                probeClient.Update();
+                await Task.Delay(50);
+            }
+
+            if (!completionSource.Task.IsCompleted)
+            {
+                return false;
+            }
+
+            bool isOnline = await completionSource.Task;
+
+            if (probeClient.IsConnected)
+            {
+                probeClient.Disconnect();
+            }
+
+            return isOnline;
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            if (probeClient != null && probeClient.IsConnected)
+            {
+                probeClient.Disconnect();
+            }
+        }
+    }
+
+    private void RefreshOfficialServerLabels()
+    {
+        SetOfficialServerButtonLabel("Official-Server-1-Button", $"Pixelis 1 ({_officialServerStatuses[0]})");
+        SetOfficialServerButtonLabel("Official-Server-2-Button", $"Pixelis 2 ({_officialServerStatuses[1]})");
+        SetOfficialServerButtonLabel("Official-Server-3-Button", $"Pixelis 3 ({_officialServerStatuses[2]})");
+        SetOfficialServerButtonLabel("Official-Server-4-Button", $"Pixelis 4 ({_officialServerStatuses[3]})");
+        SetOfficialServerButtonLabel("Official-Server-5-Button", $"Pixelis 5 ({_officialServerStatuses[4]})");
+    }
+
+    private void SetOfficialServerButtonLabel(string elementName, string text)
+    {
+        if (this.GetElement(elementName) is TextureButtonElement button)
+        {
+            button.LabelData.Text = text;
+        }
+    }
     
     protected override void Update(double delta)
     {
@@ -152,6 +319,12 @@ public class JoinGui : Gui
                 _errorMessage = "";
                 UpdateErrorLabel();
             }
+        }
+
+        _serverStatusProbeCooldown -= (float)delta;
+        if (_serverStatusProbeCooldown <= 0 && (_serverStatusProbeTask == null || _serverStatusProbeTask.IsCompleted))
+        {
+            QueueServerStatusProbe();
         }
 
         if (Input.IsKeyPressed(KeyboardKey.Escape))
@@ -183,36 +356,23 @@ public class JoinGui : Gui
             context.SpriteBatch.End();
         }
         
-        float scale = this.ScaleFactor;
-            
-        // Define base virtual size (e.g., half of 1280x720) and scale it
-        Vector2 baseSize = new Vector2(550, 310);
-        Vector2 scaledSize = baseSize * scale;
+        ModalGuiRenderer.DrawModalBackground(context, framebuffer, this.ScaleFactor, ModalGuiRenderer.DefaultBaseSize);
 
-        // Snap window dimensions to scale grid to find the "scaled" center
-        float screenWidth = MathF.Floor(GlobalGraphicsAssets.Window.GetWidth() / (float) scale) * scale;
-        float screenHeight = MathF.Floor(GlobalGraphicsAssets.Window.GetHeight() / (float) scale) * scale;
-        
-        Vector2 pos = new Vector2(
-            MathF.Floor((screenWidth / 2.0F - scaledSize.X / 2.0F) / scale) * scale,
-            MathF.Floor((screenHeight / 2.0F - scaledSize.Y / 2.0F) / scale) * scale
-        );
-        
-        // Draw gui rectangle
+        float scale = this.ScaleFactor;
+        Vector2 panelSize = _officialServerPanelSize * scale;
+        Vector2 panelPosition = new Vector2(
+            MathF.Floor(OfficialServerPanelLeft / scale) * scale,
+            MathF.Floor(((GlobalGraphicsAssets.Window.GetHeight() / 2F) - (panelSize.Y / 2F)) / scale) * scale);
+
         context.PrimitiveBatch.Begin(context.CommandList, framebuffer.OutputDescription);
-            
-        // Overlay (Full screen)
-        context.PrimitiveBatch.DrawFilledRectangle(new RectangleF(0, 0, GlobalGraphicsAssets.Window.GetWidth(), GlobalGraphicsAssets.Window.GetHeight()), color: new Color(128, 128, 128, 128));
-            
-        // Background Box
-        context.PrimitiveBatch.DrawFilledRectangle(new RectangleF(pos.X, pos.Y, scaledSize.X, scaledSize.Y), color: new Color(128, 128, 128, 128));
-            
-        // Border
-        context.PrimitiveBatch.DrawEmptyRectangle(new RectangleF(pos.X, pos.Y, scaledSize.X, scaledSize.Y), 4 * scale, color: new Color(64, 64, 64, 128));
-            
+        context.PrimitiveBatch.DrawFilledRectangle(
+            new RectangleF(panelPosition.X, panelPosition.Y, panelSize.X, panelSize.Y),
+            color: new Color(35, 35, 35, 235));
+        context.PrimitiveBatch.DrawEmptyRectangle(
+            new RectangleF(panelPosition.X, panelPosition.Y, panelSize.X, panelSize.Y),
+            3 * scale,
+            color: Color.White);
         context.PrimitiveBatch.End();
-        
-        
         
         base.Draw(context, framebuffer);
     }

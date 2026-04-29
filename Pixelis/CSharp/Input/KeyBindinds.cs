@@ -3,25 +3,29 @@ using Sparkle.CSharp;
 
 namespace Pixelis.CSharp.Controls;
 
-public static class KeyBindings
+public static class KeyBindinds
 {
+    public const KeyboardKey DefaultMoveLeft = KeyboardKey.A;
+    public const KeyboardKey DefaultMoveRight = KeyboardKey.D;
+    public const KeyboardKey DefaultJump = KeyboardKey.Space;
+
     private const string MoveLeftKey = "KeybindMoveLeft";
     private const string MoveRightKey = "KeybindMoveRight";
     private const string JumpKey = "KeybindJump";
 
     public static KeyboardKey GetMoveLeft()
     {
-        return GetOrDefault(MoveLeftKey, KeyboardKey.A);
+        return GetOrDefault(MoveLeftKey, DefaultMoveLeft);
     }
 
     public static KeyboardKey GetMoveRight()
     {
-        return GetOrDefault(MoveRightKey, KeyboardKey.D);
+        return GetOrDefault(MoveRightKey, DefaultMoveRight);
     }
 
     public static KeyboardKey GetJump()
     {
-        return GetOrDefault(JumpKey, KeyboardKey.Space);
+        return GetOrDefault(JumpKey, DefaultJump);
     }
 
     public static void SetMoveLeft(KeyboardKey key)
@@ -37,6 +41,13 @@ public static class KeyBindings
     public static void SetJump(KeyboardKey key)
     {
         SetKey(JumpKey, key);
+    }
+
+    public static void ResetToDefaults()
+    {
+        SetMoveLeft(DefaultMoveLeft);
+        SetMoveRight(DefaultMoveRight);
+        SetJump(DefaultJump);
     }
 
     private static KeyboardKey GetOrDefault(string configKey, KeyboardKey fallback)

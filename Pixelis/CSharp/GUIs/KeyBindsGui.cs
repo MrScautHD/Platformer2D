@@ -15,7 +15,7 @@ using Veldrid;
 
 namespace Pixelis.CSharp.GUIs;
 
-public class KeyBingsGui : Gui
+public class KeyBindsGui : Gui
 {
     private BindingAction? _captureFor;
 
@@ -26,7 +26,7 @@ public class KeyBingsGui : Gui
         Jump
     }
 
-    public KeyBingsGui() : base("Key Binds")
+    public KeyBindsGui() : base("Key Binds")
     {
     }
 
@@ -45,9 +45,18 @@ public class KeyBingsGui : Gui
             return true;
         }));
 
-        this.AddElement("Move-Left-Button", MakeBindButton(buttonData, "Move Left", KeyBindings.GetMoveLeft(), new Vector2(0, -50), BindingAction.MoveLeft));
-        this.AddElement("Move-Right-Button", MakeBindButton(buttonData, "Move Right", KeyBindings.GetMoveRight(), new Vector2(0, 0), BindingAction.MoveRight));
-        this.AddElement("Jump-Button", MakeBindButton(buttonData, "Jump", KeyBindings.GetJump(), new Vector2(0, 50), BindingAction.Jump));
+        LabelData resetLabelData = new LabelData(ContentRegistry.Fontoe, "Reset", 18, hoverColor: Color.White);
+        this.AddElement("Reset-Button", new TextureButtonElement(buttonData, resetLabelData, Anchor.Center, new Vector2(190, -120), size: new Vector2(100, 40), textOffset: new Vector2(0, 1), clickFunc: _ =>
+        {
+            this._captureFor = null;
+            KeyBindinds.ResetToDefaults();
+            RefreshButtonTexts();
+            return true;
+        }));
+
+        this.AddElement("Move-Left-Button", MakeBindButton(buttonData, "Move Left", KeyBindinds.GetMoveLeft(), new Vector2(0, -50), BindingAction.MoveLeft));
+        this.AddElement("Move-Right-Button", MakeBindButton(buttonData, "Move Right", KeyBindinds.GetMoveRight(), new Vector2(0, 0), BindingAction.MoveRight));
+        this.AddElement("Jump-Button", MakeBindButton(buttonData, "Jump", KeyBindinds.GetJump(), new Vector2(0, 50), BindingAction.Jump));
     }
 
     protected override void Update(double delta)
@@ -62,13 +71,13 @@ public class KeyBingsGui : Gui
                 switch (this._captureFor.Value)
                 {
                     case BindingAction.MoveLeft:
-                        KeyBindings.SetMoveLeft(pressed.Value);
+                        KeyBindinds.SetMoveLeft(pressed.Value);
                         break;
                     case BindingAction.MoveRight:
-                        KeyBindings.SetMoveRight(pressed.Value);
+                        KeyBindinds.SetMoveRight(pressed.Value);
                         break;
                     case BindingAction.Jump:
-                        KeyBindings.SetJump(pressed.Value);
+                        KeyBindinds.SetJump(pressed.Value);
                         break;
                 }
 
@@ -113,9 +122,9 @@ public class KeyBingsGui : Gui
 
     private void RefreshButtonTexts()
     {
-        SetButtonText("Move-Left-Button", "Move Left", KeyBindings.GetMoveLeft());
-        SetButtonText("Move-Right-Button", "Move Right", KeyBindings.GetMoveRight());
-        SetButtonText("Jump-Button", "Jump", KeyBindings.GetJump());
+        SetButtonText("Move-Left-Button", "Move Left", KeyBindinds.GetMoveLeft());
+        SetButtonText("Move-Right-Button", "Move Right", KeyBindinds.GetMoveRight());
+        SetButtonText("Jump-Button", "Jump", KeyBindinds.GetJump());
     }
 
     private void SetButtonText(string elementName, string actionName, KeyboardKey key)

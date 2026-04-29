@@ -18,7 +18,8 @@ public static class LevelFactory
         "Level 8",
         "Level 9",
         "Level 10",
-        "Level 11"
+        "Level 11",
+        "Level 12",
     ];
 
     public static bool IsBuiltInLevelName(string name)
@@ -48,6 +49,7 @@ public static class LevelFactory
             "Level 9" => new Level9(),
             "Level 10" => new Level10(),
             "Level 11" => new Level11(),
+            "Level 12" => new Level12(),
             _ => CreateCustomLevel(levelName)
         };
     }

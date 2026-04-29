@@ -102,7 +102,7 @@ public class OptionsGui : Gui
         LabelData keyBingsLabelData = new LabelData(ContentRegistry.Fontoe, "Keybinds", 18, hoverColor: Color.White);
         this.AddElement("Key-Binds-Button", new TextureButtonElement(backButtonData, keyBingsLabelData, Anchor.Center, new Vector2(180, -120), size: new Vector2(130, 40), textOffset: new Vector2(0, 1), clickFunc: _ =>
         {
-            GuiManager.SetGui(new KeyBingsGui());
+            GuiManager.SetGui(new KeyBindsGui());
             return true;
         }));
 

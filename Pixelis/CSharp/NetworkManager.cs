@@ -16,6 +16,8 @@ namespace Pixelis.CSharp;
 
 public static class NetworkManager
 {
+    private delegate void ChatCommandHandler(string[] args);
+
     public static Server? Server;
     public static Client? Client;
     
@@ -56,6 +58,12 @@ public static class NetworkManager
     private const ushort ChatMessageId = 9;
     private const ushort ClearChatMessageId = 10;
     private const ushort PlayerDeathMessageId = 11;
+    private static readonly Dictionary<string, ChatCommandHandler> _chatCommands = new(StringComparer.OrdinalIgnoreCase);
+
+    static NetworkManager()
+    {
+        RegisterChatCommands();
+    }
 
     public static void Update()
     {
@@ -852,37 +860,23 @@ public static class NetworkManager
             return;
         }
 
-        if (string.Equals(input.Trim(), "/clear", StringComparison.OrdinalIgnoreCase))
+        string trimmedInput = input.Trim();
+
+        if (TryHandleChatCommand(trimmedInput))
         {
-            if (Server != null && Server.IsRunning)
-            {
-                if (Client != null && Client.IsConnected)
-                {
-                    Message message = Message.Create(MessageSendMode.Reliable, ClearChatMessageId);
-                    Client.Send(message);
-                }
-                else
-                {
-                    ChatClearedReceived?.Invoke();
-                }
-            }
-            else
-            {
-                ChatMessageReceived?.Invoke("Error: Only the host can execute this command.");
-            }
             return;
         }
 
         if (Client != null && Client.IsConnected)
         {
             Message message = Message.Create(MessageSendMode.Reliable, ChatMessageId);
-            message.AddString(input);
+            message.AddString(trimmedInput);
             Client.Send(message);
         }
         else
         {
             string username = ResolveLocalUsername();
-            ChatMessageReceived?.Invoke($"{username}: {input}");
+            ChatMessageReceived?.Invoke($"{username}: {trimmedInput}");
         }
     }
 
@@ -933,5 +927,66 @@ public static class NetworkManager
         string username = PlayerUsernames.TryGetValue(playerId, out string? name) ? name : $"Player {playerId}";
         _announcedDisconnects.Add(playerId);
         BroadcastSystemChatMessage($"{username} left the server.");
+    }
+
+    private static void RegisterChatCommands()
+    {
+        _chatCommands.Clear();
+
+        // Add new chat commands here.
+        RegisterChatCommand("clear", HandleClearCommand);
+    }
+
+    private static void RegisterChatCommand(string name, ChatCommandHandler handler)
+    {
+        _chatCommands[name] = handler;
+    }
+
+    private static bool TryHandleChatCommand(string input)
+    {
+        if (!input.StartsWith('/'))
+        {
+            return false;
+        }
+
+        string[] parts = input[1..]
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (parts.Length == 0)
+        {
+            return true;
+        }
+
+        string commandName = parts[0];
+        string[] args = parts.Skip(1).ToArray();
+
+        if (!_chatCommands.TryGetValue(commandName, out ChatCommandHandler? handler))
+        {
+            ChatMessageReceived?.Invoke($"Unknown command: /{commandName}");
+            return true;
+        }
+
+        handler(args);
+        return true;
+    }
+
+    private static void HandleClearCommand(string[] args)
+    {
+        if (Server != null && Server.IsRunning)
+        {
+            if (Client != null && Client.IsConnected)
+            {
+                Message message = Message.Create(MessageSendMode.Reliable, ClearChatMessageId);
+                Client.Send(message);
+            }
+            else
+            {
+                ChatClearedReceived?.Invoke();
+            }
+
+            return;
+        }
+
+        ChatMessageReceived?.Invoke("Only the host can execute this command.");
     }
 }

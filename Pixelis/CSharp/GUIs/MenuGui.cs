@@ -5,6 +5,7 @@ using Bliss.CSharp.Textures;
 using Bliss.CSharp.Transformations;
 using Bliss.CSharp.Windowing;
 using Pixelis.CSharp.Entities;
+using Pixelis.CSharp.Controls;
 using Pixelis.CSharp.GUIs.Loading;
 using Pixelis.CSharp.Levels;
 using Pixelis.CSharp.Scenes;
@@ -46,8 +47,7 @@ public class MenuGui : Gui
         ImageData logoData = new ImageData(ContentRegistry.Logo);
         this.AddElement("logo", new ImageElement(logoData, Anchor.TopCenter, new Vector2(0, 50), scale: new Vector2(2,2)));
 
-        string controlText = "Controls:\nA/Left: LEFT\nD/Right: RIGHT\nSpace/Up: JUMP";
-        LabelData controlLabelData = new LabelData(ContentRegistry.Fontoe, controlText, 18, color: Color.White);
+        LabelData controlLabelData = new LabelData(ContentRegistry.Fontoe, this.BuildControlText(), 18, color: Color.White);
         this.AddElement("Control-Label", new LabelElement(controlLabelData, Anchor.TopLeft, new Vector2(10, 10)));
 
         string creditsText = "Credits:\nLio: Developer/Designer\nMrScautHD: Developer";
@@ -170,8 +170,7 @@ public class MenuGui : Gui
         this.AddElement("Texture-Drop-Down", dropDownElement);
 
         // Texture button.
-        TextureButtonData textureButtonData = new TextureButtonData(ContentRegistry.UiButton,
-            hoverColor: Color.LightGray, resizeMode: ResizeMode.NineSlice, borderInsets: new BorderInsets(12));
+        TextureButtonData textureButtonData = new TextureButtonData(ContentRegistry.UiButton, hoverColor: Color.LightGray, resizeMode: ResizeMode.NineSlice, borderInsets: new BorderInsets(12));
         LabelData textureButtonLabelData = new LabelData(ContentRegistry.Fontoe, "Play", 18, hoverColor: Color.White);
 
         this.AddElement("Texture-Button", new TextureButtonElement(textureButtonData, textureButtonLabelData,
@@ -252,6 +251,16 @@ public class MenuGui : Gui
         ((TextureButtonElement)this.GetElement("Exit-Button")!).Offset = new Vector2(0, 240);
     }
 
+    protected override void Update(double delta)
+    {
+        base.Update(delta);
+
+        if (this.TryGetElement("Control-Label", out GuiElement? element) && element is LabelElement labelElement)
+        {
+            labelElement.Data.Text = this.BuildControlText();
+        }
+    }
+
     protected override void Draw(GraphicsContext context, Framebuffer framebuffer)
     {
         IWindow window = GlobalGraphicsAssets.Window;
@@ -280,5 +289,10 @@ public class MenuGui : Gui
 
         Player player = new Player(new Transform() { Translation = new Vector3(0, -16 * 2, 0) });
         SceneManager.ActiveScene?.AddEntity(player);
+    }
+
+    private string BuildControlText()
+    {
+        return $"Controls:\n{KeyBindinds.GetMoveLeft()}: LEFT\n{KeyBindinds.GetMoveRight()}: RIGHT\n{KeyBindinds.GetJump()}: JUMP";
     }
 }

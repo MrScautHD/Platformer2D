@@ -246,9 +246,9 @@ public class Player : Entity
                 float airAccel    = 0.5f;
                 float maxSpeed    = BaseMaxSpeed;
                 float jumpForce   = BaseJumpForce;
-                KeyboardKey moveLeftKey = KeyBindings.GetMoveLeft();
-                KeyboardKey moveRightKey = KeyBindings.GetMoveRight();
-                KeyboardKey jumpKey = KeyBindings.GetJump();
+                KeyboardKey moveLeftKey = KeyBindinds.GetMoveLeft();
+                KeyboardKey moveRightKey = KeyBindinds.GetMoveRight();
+                KeyboardKey jumpKey = KeyBindinds.GetJump();
 
                 bool emitParticles = false;
 
