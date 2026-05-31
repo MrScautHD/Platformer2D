@@ -3,15 +3,14 @@ using Bliss.CSharp.Colors;
 using Bliss.CSharp.Interact;
 using Bliss.CSharp.Interact.Keyboards;
 using Bliss.CSharp.Textures;
-using Bliss.CSharp.Transformations;
 using Bliss.CSharp.Windowing;
 using MiniAudioEx.Core.StandardAPI;
+using Pixelis.CSharp.Scenes;
 using Sparkle.CSharp;
 using Sparkle.CSharp.Graphics;
 using Sparkle.CSharp.GUI;
 using Sparkle.CSharp.GUI.Elements;
-using Sparkle.CSharp.GUI.Elements.Data;
-using Sparkle.CSharp.Overlays;
+using Sparkle.CSharp.GUI.Elements.Data; 
 using Sparkle.CSharp.Scenes;
 using Veldrith;
 
@@ -39,14 +38,7 @@ public class OptionsGui : Gui
         LabelData backButtonLabelData = GuiText.ButtonLabel(backText, backButtonSize.X);
         
         this.AddElement("Options-Button", new TextureButtonElement(backButtonData, backButtonLabelData, Anchor.Center, new Vector2(-200, -120), size: backButtonSize, textOffset: new Vector2(0, 1), clickFunc: (element) => {
-            if (SceneManager.ActiveScene != null)
-            {
-                GuiManager.SetGui(new PauseMenuGui());
-            }
-            else
-            {
-                GuiManager.SetGui(new MenuGui());
-            }
+            ReturnToPreviousGui();
             return true;
         }));
         
@@ -156,14 +148,7 @@ public class OptionsGui : Gui
         if (Input.IsKeyPressed(KeyboardKey.Escape))
         {
 
-            if (SceneManager.ActiveScene == null)
-            {
-                GuiManager.SetGui(new MenuGui());
-            }
-            else
-            {
-                GuiManager.SetGui(new PauseMenuGui());
-            }
+            ReturnToPreviousGui();
         }
     }
 
@@ -244,6 +229,17 @@ public class OptionsGui : Gui
             GuiManager.SetScale(clampedScale);
             ((PixelisGame) Game.Instance!).OptionsConfig.SetValue("GuiScale", clampedScale);
         }
+    }
+
+    private static void ReturnToPreviousGui()
+    {
+        if (SceneManager.ActiveScene is CustomLevelScene { IsEditorMode: true, IsPlayingFromEditor: false } editorScene)
+        {
+            GuiManager.SetGui(new LevelEditorGui(editorScene));
+            return;
+        }
+
+        GuiManager.SetGui(SceneManager.ActiveScene == null ? new MenuGui() : new PauseMenuGui());
     }
 
     private void RebuildGuiScaleMarkers(int maxGuiScale)

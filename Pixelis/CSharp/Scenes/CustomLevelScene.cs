@@ -40,6 +40,8 @@ public class CustomLevelScene : LevelScene
     private (int X, int Y)? _pendingPortalStart;
     private bool _isPlaying;
     private bool _suppressPlacementUntilMouseReleased;
+    private bool _useMouseOnlyTools;
+    private bool _hasUnsavedChanges;
 
     public CustomLevelScene(CustomLevelData levelData, bool editorMode) : base(levelData.Name)
     {
@@ -77,6 +79,8 @@ public class CustomLevelScene : LevelScene
     public string NextLevelName => _levelData.NextLevelName;
     public bool IsSaveDialogOpen => GuiManager.ActiveGui is LevelEditorGui editorGui && editorGui.IsSaveDialogOpen;
     public bool IsPlayingFromEditor => _isPlaying;
+    public bool UseMouseOnlyTools => _useMouseOnlyTools;
+    public bool HasUnsavedChanges => _hasUnsavedChanges;
 
     protected override void Init()
     {
@@ -115,9 +119,14 @@ public class CustomLevelScene : LevelScene
             return;
         }
 
+        if (GuiManager.ActiveGui is not LevelEditorGui)
+        {
+            return;
+        }
+
         if (_suppressPlacementUntilMouseReleased)
         {
-            if (!Input.IsMouseButtonDown(MouseButton.Left))
+            if (!Input.IsMouseButtonDown(MouseButton.Left) && !Input.IsMouseButtonDown(MouseButton.Right))
             {
                 _suppressPlacementUntilMouseReleased = false;
             }
@@ -127,43 +136,27 @@ public class CustomLevelScene : LevelScene
 
         UpdateEditorCamera(delta);
 
-        if (IsSaveDialogOpen)
+        if (IsEditorModalOpen)
         {
             return;
         }
 
-        if (Input.IsKeyPressed(KeyboardKey.Escape))
+        if (!IsMouseOverEditorUi())
         {
-            if (_pendingMovingBlockStart.HasValue || _pendingPortalStart.HasValue)
+            if (_useMouseOnlyTools)
             {
-                ClearPendingPlacement();
-                return;
+                if (Input.IsMouseButtonDown(MouseButton.Right))
+                {
+                    HandleEditorToolInput(EditorTool.Eraser);
+                }
+                else if (Input.IsMouseButtonDown(MouseButton.Left))
+                {
+                    HandleEditorToolInput(EditorTool.Place);
+                }
             }
-
-            AsyncOperationBackToBrowser();
-            return;
-        }
-
-        if (Input.IsMouseButtonDown(MouseButton.Left) && !IsMouseOverEditorUi())
-        {
-            Vector2 worldMousePosition = SceneManager.ActiveCam2D?.GetScreenToWorld(Input.GetMousePosition()) ?? Vector2.Zero;
-            (int blockX, int blockY) = GetSnappedBlockCoordinate(worldMousePosition);
-
-            if (_selectedTool == EditorTool.Eraser)
+            else if (Input.IsMouseButtonDown(MouseButton.Left))
             {
-                RemovePlaceable(blockX, blockY);
-            }
-            else if (_selectedPlaceable == PlaceableType.MovingBlock)
-            {
-                HandleMovingBlockPlacement(blockX, blockY);
-            }
-            else if (_selectedPlaceable == PlaceableType.Portal)
-            {
-                HandlePortalPlacement(blockX, blockY);
-            }
-            else
-            {
-                PlacePlaceable(CreatePlaceableData(_selectedPlaceable, blockX, blockY, depth: _selectedPlaceableDepth), persist: true);
+                HandleEditorToolInput(_selectedTool);
             }
         }
     }
@@ -192,7 +185,7 @@ public class CustomLevelScene : LevelScene
         context.PrimitiveBatch.DrawEmptyRectangle(
             new RectangleF(outlineTopLeft.X, outlineTopLeft.Y, BlockSize, BlockSize),
             1.5F,
-            color: _selectedTool == EditorTool.Eraser ? Color.Red : Color.White);
+            color: ShouldDrawEraserPreview() ? Color.Red : Color.White);
 
         if (_pendingMovingBlockStart.HasValue)
         {
@@ -292,6 +285,18 @@ public class CustomLevelScene : LevelScene
         RefreshEditorGui();
     }
 
+    public void SetUseMouseOnlyTools(bool useMouseOnlyTools)
+    {
+        _useMouseOnlyTools = useMouseOnlyTools;
+        if (useMouseOnlyTools)
+        {
+            _selectedTool = EditorTool.Place;
+            ClearPendingPlacement();
+        }
+
+        RefreshEditorGui();
+    }
+
     public void SetNextLevelName(string nextLevelName)
     {
         _levelData.NextLevelName = nextLevelName.Trim();
@@ -372,11 +377,32 @@ public class CustomLevelScene : LevelScene
         SyncLevelData();
 
         CustomLevelStorage.Save(_levelData, _originalLevelId);
+        _hasUnsavedChanges = false;
+        RefreshEditorGui();
     }
 
     public void BackToBrowser()
     {
         AsyncOperationBackToBrowser();
+    }
+
+    public void HandleEditorEscape()
+    {
+        if (_pendingMovingBlockStart.HasValue || _pendingPortalStart.HasValue)
+        {
+            ClearPendingPlacement();
+            return;
+        }
+
+        if (GuiManager.ActiveGui is LevelEditorGui editorGui)
+        {
+            editorGui.OpenEscapeMenu();
+        }
+    }
+
+    public void OpenOptions()
+    {
+        GuiManager.SetGui(new OptionsGui());
     }
 
     private void AsyncOperationBackToBrowser()
@@ -427,7 +453,7 @@ public class CustomLevelScene : LevelScene
 
     private bool IsMouseOverEditorUi()
     {
-        if (IsSaveDialogOpen)
+        if (IsEditorModalOpen)
         {
             return true;
         }
@@ -448,6 +474,36 @@ public class CustomLevelScene : LevelScene
 
         return Contains(topBarArea, mousePosition)
                || Contains(bottomBarArea, mousePosition);
+    }
+
+    private void HandleEditorToolInput(EditorTool tool)
+    {
+        Vector2 worldMousePosition = SceneManager.ActiveCam2D?.GetScreenToWorld(Input.GetMousePosition()) ?? Vector2.Zero;
+        (int blockX, int blockY) = GetSnappedBlockCoordinate(worldMousePosition);
+
+        if (tool == EditorTool.Eraser)
+        {
+            RemovePlaceable(blockX, blockY);
+        }
+        else if (_selectedPlaceable == PlaceableType.MovingBlock)
+        {
+            HandleMovingBlockPlacement(blockX, blockY);
+        }
+        else if (_selectedPlaceable == PlaceableType.Portal)
+        {
+            HandlePortalPlacement(blockX, blockY);
+        }
+        else
+        {
+            PlacePlaceable(CreatePlaceableData(_selectedPlaceable, blockX, blockY, depth: _selectedPlaceableDepth), persist: true);
+        }
+    }
+
+    private bool ShouldDrawEraserPreview()
+    {
+        return _useMouseOnlyTools
+            ? Input.IsMouseButtonDown(MouseButton.Right)
+            : _selectedTool == EditorTool.Eraser;
     }
 
     private static bool Contains(RectangleF rectangle, Vector2 point)
@@ -646,7 +702,10 @@ public class CustomLevelScene : LevelScene
             .OrderBy(block => block.Y)
             .ThenBy(block => block.X)
             .ToList();
+        _hasUnsavedChanges = true;
     }
+
+    private bool IsEditorModalOpen => GuiManager.ActiveGui is LevelEditorGui editorGui && editorGui.IsAnyModalOpen;
 
     private void RefreshEditorGui()
     {

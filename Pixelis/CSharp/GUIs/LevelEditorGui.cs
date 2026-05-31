@@ -22,8 +22,11 @@ public class LevelEditorGui : Gui
     private TextureDropDownElement? _movingBlockSpeedDropDown;
     private TextureDropDownElement? _placeableDepthDropDown;
     private TextureDropDownElement? _nextLevelDropDown;
+    private bool _isEscapeMenuOpen;
+    private bool _isUnsavedExitDialogOpen;
 
     public bool IsSaveDialogOpen => _saveNameTextBox?.Enabled ?? false;
+    public bool IsAnyModalOpen => IsSaveDialogOpen || _isEscapeMenuOpen || _isUnsavedExitDialogOpen;
 
     public LevelEditorGui(CustomLevelScene scene) : base("LevelEditorOverlay", null)
     {
@@ -189,7 +192,7 @@ public class LevelEditorGui : Gui
             clickFunc: _ =>
             {
                 _scene.SuppressPlacementUntilMouseRelease();
-                _scene.BackToBrowser();
+                RequestBackToBrowser();
                 return true;
             }));
 
@@ -218,6 +221,31 @@ public class LevelEditorGui : Gui
             {
                 _scene.SuppressPlacementUntilMouseRelease();
                 _scene.SetTool(EditorTool.Eraser);
+                return true;
+            }));
+
+        ToggleData mouseOnlyToggleData = new(
+            ContentRegistry.ToggleBackground,
+            ContentRegistry.ToggleCheckmark,
+            checkboxHoverColor: Color.LightGray,
+            checkmarkHoverColor: Color.LightGray);
+        LabelData mouseOnlyToggleLabelData = new(
+            ContentRegistry.Fontoe,
+            Localization.T("gui.level_editor.mouse_only_tools"),
+            18,
+            color: Color.White);
+
+        this.AddElement("Mouse-Only-Tools-Toggle", new ToggleElement(
+            mouseOnlyToggleData,
+            mouseOnlyToggleLabelData,
+            Anchor.BottomRight,
+            new Vector2(-5, -5),
+            5,
+            toggleState: _scene.UseMouseOnlyTools,
+            clickFunc: _ =>
+            {
+                _scene.SuppressPlacementUntilMouseRelease();
+                _scene.SetUseMouseOnlyTools(!_scene.UseMouseOnlyTools);
                 return true;
             }));
 
@@ -320,7 +348,52 @@ public class LevelEditorGui : Gui
         nextLevelLabel.Interactable = false;
         this.AddElement("Next-Level-Label", nextLevelLabel);
 
+        this.AddElement("Escape-Menu-Title", new LabelElement(
+            new LabelData(ContentRegistry.Fontoe, Localization.T("gui.level_editor.escape_menu_title"), 18, color: Color.White),
+            Anchor.Center,
+            new Vector2(0, -78),
+            new Vector2(2, 2)));
+
+        this.AddElement("Escape-Menu-Hint", new LabelElement(
+            new LabelData(ContentRegistry.Fontoe, Localization.T("gui.level_editor.escape_menu_hint"), 18, color: Color.LightGray),
+            Anchor.Center,
+            new Vector2(0, -44)));
+
+        this.AddElement("Escape-Menu-Button", CreateModalButton(buttonData, Localization.T("common.menu"), new Vector2(-170, 40), RequestBackToBrowser));
+        this.AddElement("Escape-Options-Button", CreateModalButton(buttonData, Localization.T("common.options"), new Vector2(0, 40), () =>
+        {
+            SetEscapeMenuVisible(false);
+            _scene.OpenOptions();
+        }));
+        this.AddElement("Escape-Cancel-Button", CreateModalButton(buttonData, Localization.T("common.cancel"), new Vector2(170, 40), () =>
+        {
+            SetEscapeMenuVisible(false);
+        }));
+
+        this.AddElement("Unsaved-Exit-Title", new LabelElement(
+            new LabelData(ContentRegistry.Fontoe, Localization.T("gui.level_editor.unsaved_exit_title"), 18, color: Color.White),
+            Anchor.Center,
+            new Vector2(0, -84),
+            new Vector2(2, 2)));
+
+        this.AddElement("Unsaved-Exit-Hint", new LabelElement(
+            new LabelData(ContentRegistry.Fontoe, Localization.T("gui.level_editor.unsaved_exit_hint"), 18, color: Color.LightGray),
+            Anchor.Center,
+            new Vector2(0, -46)));
+
+        this.AddElement("Unsaved-Save-Menu-Button", CreateModalButton(buttonData, Localization.T("gui.level_editor.save_and_menu"), new Vector2(-180, 54), SaveAndBackToBrowser));
+        this.AddElement("Unsaved-Discard-Menu-Button", CreateModalButton(buttonData, Localization.T("gui.level_editor.discard_and_menu"), new Vector2(0, 54), () =>
+        {
+            _scene.BackToBrowser();
+        }));
+        this.AddElement("Unsaved-Cancel-Button", CreateModalButton(buttonData, Localization.T("common.cancel"), new Vector2(180, 54), () =>
+        {
+            SetUnsavedExitDialogVisible(false);
+        }));
+
         SetSaveDialogVisible(false);
+        SetEscapeMenuVisible(false);
+        SetUnsavedExitDialogVisible(false);
         RefreshEditorState();
     }
 
@@ -328,9 +401,27 @@ public class LevelEditorGui : Gui
     {
         base.Update(delta);
 
-        if (IsSaveDialogOpen && Input.IsKeyPressed(KeyboardKey.Escape))
+        if (Input.IsKeyPressed(KeyboardKey.Escape))
         {
-            SetSaveDialogVisible(false);
+            if (IsSaveDialogOpen)
+            {
+                SetSaveDialogVisible(false);
+                return;
+            }
+
+            if (_isUnsavedExitDialogOpen)
+            {
+                SetUnsavedExitDialogVisible(false);
+                return;
+            }
+
+            if (_isEscapeMenuOpen)
+            {
+                SetEscapeMenuVisible(false);
+                return;
+            }
+
+            _scene.HandleEditorEscape();
             return;
         }
 
@@ -373,9 +464,11 @@ public class LevelEditorGui : Gui
             new RectangleF(0, snappedWindowSize.Y - bottomBarHeight, snappedWindowSize.X, bottomBarHeight),
             color: new Color(15, 15, 15, 160));
 
-        if (IsSaveDialogOpen)
+        if (IsAnyModalOpen)
         {
-            Vector2 modalSize = new Vector2(420, 280) * scale;
+            Vector2 modalSize = (_isEscapeMenuOpen || _isUnsavedExitDialogOpen
+                ? new Vector2(560, 250)
+                : new Vector2(420, 280)) * scale;
             Vector2 modalPosition = GetCenteredRectanglePosition(snappedWindowSize, modalSize, scale);
 
             context.PrimitiveBatch.DrawFilledRectangle(
@@ -422,9 +515,21 @@ public class LevelEditorGui : Gui
     {
         SetButtonLabel("Place-Button", _scene.SelectedTool == EditorTool.Place ? $"[{Localization.T("gui.level_editor.tool.place")}]" : Localization.T("gui.level_editor.tool.place"));
         SetButtonLabel("Eraser-Button", _scene.SelectedTool == EditorTool.Eraser ? $"[{Localization.T("gui.level_editor.tool.eraser")}]" : Localization.T("gui.level_editor.tool.eraser"));
+        ToggleElement("Place-Button", !_scene.UseMouseOnlyTools);
+        ToggleElement("Eraser-Button", !_scene.UseMouseOnlyTools);
         ToggleElement("Moving-Block-Speed-Drop-Down", _scene.SelectedPlaceable == PlaceableType.MovingBlock);
         ToggleElement("Placeable-Depth-Drop-Down", true);
-        SetStatus(_scene.GetEditorStatusMessage());
+        SetStatus(_scene.UseMouseOnlyTools
+            ? $"{_scene.GetEditorStatusMessage()} | {Localization.T("gui.level_editor.mouse_only_hint")}"
+            : _scene.GetEditorStatusMessage());
+    }
+
+    public void OpenEscapeMenu()
+    {
+        _scene.SuppressPlacementUntilMouseRelease();
+        SetSaveDialogVisible(false);
+        SetUnsavedExitDialogVisible(false);
+        SetEscapeMenuVisible(true);
     }
 
     private TextureButtonElement CreateModalButton(TextureButtonData buttonData, string text, Vector2 offset, Action onClick)
@@ -449,6 +554,12 @@ public class LevelEditorGui : Gui
 
     private void SetSaveDialogVisible(bool visible)
     {
+        if (visible)
+        {
+            SetEscapeMenuVisible(false);
+            SetUnsavedExitDialogVisible(false);
+        }
+
         ToggleElement("Save-Name-TextBox", visible);
         ToggleElement("Save-Confirm-Button", visible);
         ToggleElement("Save-Cancel-Button", visible);
@@ -465,6 +576,55 @@ public class LevelEditorGui : Gui
         if (visible && _nextLevelDropDown != null)
         {
             RebuildDropDownOptions(_nextLevelDropDown, GetNextLevelOptions(_scene.NextLevelName));
+        }
+    }
+
+    private void SetEscapeMenuVisible(bool visible)
+    {
+        _isEscapeMenuOpen = visible;
+        ToggleElement("Escape-Menu-Title", visible);
+        ToggleElement("Escape-Menu-Hint", visible);
+        ToggleElement("Escape-Menu-Button", visible);
+        ToggleElement("Escape-Options-Button", visible);
+        ToggleElement("Escape-Cancel-Button", visible);
+    }
+
+    private void SetUnsavedExitDialogVisible(bool visible)
+    {
+        _isUnsavedExitDialogOpen = visible;
+        ToggleElement("Unsaved-Exit-Title", visible);
+        ToggleElement("Unsaved-Exit-Hint", visible);
+        ToggleElement("Unsaved-Save-Menu-Button", visible);
+        ToggleElement("Unsaved-Discard-Menu-Button", visible);
+        ToggleElement("Unsaved-Cancel-Button", visible);
+    }
+
+    private void RequestBackToBrowser()
+    {
+        _scene.SuppressPlacementUntilMouseRelease();
+        SetEscapeMenuVisible(false);
+
+        if (_scene.HasUnsavedChanges)
+        {
+            SetSaveDialogVisible(false);
+            SetUnsavedExitDialogVisible(true);
+            return;
+        }
+
+        _scene.BackToBrowser();
+    }
+
+    private void SaveAndBackToBrowser()
+    {
+        try
+        {
+            _scene.SaveLevel(_scene.LevelName);
+            _scene.BackToBrowser();
+        }
+        catch (Exception exception)
+        {
+            SetUnsavedExitDialogVisible(false);
+            SetStatus(exception.Message);
         }
     }
 

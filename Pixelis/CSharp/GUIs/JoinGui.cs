@@ -4,7 +4,6 @@ using Bliss.CSharp.Graphics.Rendering.Renderers.Batches.Sprites;
 using Bliss.CSharp.Interact;
 using Bliss.CSharp.Interact.Keyboards;
 using Bliss.CSharp.Textures;
-using Bliss.CSharp.Transformations;
 using Bliss.CSharp.Windowing;
 using Riptide;
 using Sparkle.CSharp.Graphics;
